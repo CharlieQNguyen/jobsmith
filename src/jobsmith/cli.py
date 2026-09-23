@@ -11,16 +11,18 @@ from urllib.parse import urlparse
 
 import typer
 
-from jobsmith import ats, browser, credentials, scaffold, store
+from jobsmith import ats, browser, credentials, resume, scaffold, store
 from jobsmith.models import Account, Application, Event, Status
 
 app = typer.Typer(no_args_is_help=True, help="Keep your job search in plain files.")
 apps_cmd = typer.Typer(no_args_is_help=True, help="Job applications.")
 creds_cmd = typer.Typer(no_args_is_help=True, help="Site credentials in the OS keychain.")
 browser_cmd = typer.Typer(no_args_is_help=True, help="The Chrome that you log into and an agent drives.")
+resume_cmd = typer.Typer(no_args_is_help=True, help="Resumes (JSON Resume files in resumes/).")
 app.add_typer(apps_cmd, name="apps")
 app.add_typer(creds_cmd, name="creds")
 app.add_typer(browser_cmd, name="browser")
+app.add_typer(resume_cmd, name="resume")
 
 DataOpt = Annotated[
     Path | None,
@@ -258,6 +260,46 @@ def browser_status() -> None:
     up = browser.is_running()
     typer.echo(f"{'Running' if up else 'Not running'} ({browser.endpoint()})")
     raise typer.Exit(0 if up else 1)
+
+
+@resume_cmd.command("render")
+def resume_render(
+    file: Annotated[Path | None, typer.Argument(help="JSON Resume file [default: resumes/base.json]")] = None,
+    out: Annotated[
+        Path | None, typer.Option("--out", "-o", help="PDF to write [default: beside the JSON]")
+    ] = None,
+    full_roles: Annotated[
+        int, typer.Option(help="Roles shown with highlights; older ones get one line. 0 = all")
+    ] = 5,
+    bullets: Annotated[int, typer.Option(help="Highlights per role. 0 = all")] = 2,
+    accent: Annotated[str, typer.Option(help="Accent colour for the name line and headings")] = "#2c6a57",
+    html: Annotated[bool, typer.Option("--html", help="Also write the HTML beside the PDF")] = False,
+    data: DataOpt = None,
+) -> None:
+    """Render a resume to a one-page PDF (the compact layout) with headless Chrome."""
+    root = store.data_dir(data)
+    src = file or root / "resumes" / "base.json"
+    if not src.exists() and not src.is_absolute() and (root / src).exists():
+        src = root / src
+    target = out or src.with_suffix(".pdf")
+    try:
+        page = resume.to_html(
+            resume.load(src), resume.Layout(full_roles=full_roles, bullets=bullets, accent=accent)
+        )
+        if html:
+            target.with_suffix(".html").write_text(page)
+        pages = resume.to_pdf(page, target)
+    except (OSError, resume.ResumeError) as e:
+        typer.secho(str(e), fg="red")
+        raise typer.Exit(1) from e
+    shown = target.relative_to(root) if target.is_relative_to(root) else target
+    typer.secho(f"Wrote {shown} ({pages} page{'s' if pages != 1 else ''})", fg="green")
+    if pages > 1:
+        typer.secho(
+            "The compact layout is meant for one page. Try --bullets 1, a lower --full-roles, "
+            "or shorter highlights.",
+            fg="yellow",
+        )
 
 
 @app.command()

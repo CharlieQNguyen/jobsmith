@@ -65,6 +65,7 @@ jobsmith apps update QUERY [--status S] [--event TEXT] [--followup +7d]
 jobsmith apps show QUERY                 # QUERY: slug or words from company/role
 jobsmith apps list --open                # open applications
 jobsmith apps due                        # follow-ups due today or earlier
+jobsmith resume render [FILE.json]       # one-page PDF beside it (default resumes/base.json)
 jobsmith creds new HOST USERNAME         # generate a password, keep it in the keychain, copy it
 jobsmith creds copy HOST USERNAME        # copy a stored password to the clipboard
 jobsmith browser start | stop | status   # the Chrome you sign into and an agent drives

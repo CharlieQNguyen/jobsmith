@@ -10,7 +10,8 @@ CLAUDE.md, so it updates with the submodule.
 - `profile/profile.yaml` — contact info, work authorization, and reusable answers to common
   application questions (`standard_answers`). Use these when filling forms.
 - `resumes/` — JSON Resume files. `base.json` is the master; tailored copies are named
-  `YYYY-MM-<company>-<role>.json`. Never edit `base.json` just to tailor for one job.
+  `YYYY-MM-<company>-<role>.json`. Never edit `base.json` just to tailor for one job. PDFs are
+  rendered from them (`jobsmith resume render`) and sit beside them with the same name.
 - `cover-letters/` — Markdown, named like the tailored resume.
 - `applications/` — one `<company>-<role>.md` per job: YAML frontmatter (schema: `Application` in
   `tools/jobsmith/src/jobsmith/models.py`) plus free-form notes. Append to `events` rather than
@@ -33,6 +34,8 @@ worktree you're in.
   — prefer this to hand-editing frontmatter; status changes are logged as events
 - `jobsmith apps list --open`, `jobsmith apps show <query>`
 - `jobsmith apps due` — follow-ups due
+- `jobsmith resume render [resumes/<file>.json] [--bullets N] [--full-roles N] [--html]` — PDF
+  in the one-page compact layout (default `resumes/base.json`); warns if it overflows a page
 - `jobsmith browser status` — is the signed-in Chrome up?
 - `jobsmith init --force .` — refresh this repo's scaffolding from the current jobsmith (never
   touches your data files)
