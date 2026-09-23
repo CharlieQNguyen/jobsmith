@@ -4,6 +4,8 @@
     "name": "Alex Example",
     "label": "Backend Engineer",
     "email": "alex@example.com",
+    "phone": "555-0100",
+    "summary": "Backend engineer who likes boring, reliable systems: payments, queues and the tooling around them.",
     "location": { "city": "Portland", "region": "OR", "countryCode": "US" },
     "profiles": [{ "network": "GitHub", "username": "alex-example", "url": "https://github.com/alex-example" }]
   },
@@ -11,12 +13,30 @@
     {
       "name": "Example Payments Inc.",
       "position": "Software Engineer",
+      "location": "Portland, OR",
       "startDate": "2022-03",
       "highlights": [
-        "Migrated billing from a monolith to event-driven services, cutting invoice errors 40%",
-        "Built the internal API gateway used by 30+ services"
+        "Billing migration: Moved billing from a monolith to event-driven services, cutting invoice errors 40%",
+        "Built the internal API gateway used by 30+ services",
+        "Ran the on-call rotation for the payments team"
       ]
+    },
+    {
+      "name": "Sample Retail Co.",
+      "position": "Junior Developer",
+      "location": "Portland, OR",
+      "startDate": "2019-06",
+      "endDate": "2022-02",
+      "highlights": ["Wrote the inventory sync that replaced nightly CSV imports"]
+    },
+    {
+      "name": "Placeholder Labs",
+      "position": "Intern",
+      "startDate": "2018-06",
+      "endDate": "2018-09"
     }
   ],
+  "education": [{ "institution": "Example State University", "studyType": "B.S.", "area": "Computer Science", "endDate": "2019" }],
+  "certificates": [{ "name": "Example Cloud Associate", "issuer": "Example Cloud", "date": "2023-05-01" }],
   "skills": [{ "name": "Backend", "keywords": ["Python", "PostgreSQL", "Kafka", "AWS"] }]
 }

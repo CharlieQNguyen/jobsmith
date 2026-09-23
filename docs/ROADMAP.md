@@ -22,15 +22,19 @@ and update it when something ships or plans change. Keep it free of personal dat
 - **Import from LinkedIn.** `/jobsmith:import-linkedin` reads five pages of the user's own
   profile (main, experience, education, skills, certifications) in a browser they signed into,
   asks about gaps, then writes `profile/profile.yaml` and a schema-valid `resumes/base.json`.
+- **Resume PDFs.** `jobsmith resume render` turns a JSON Resume into a one-page Letter PDF with
+  headless Chrome: the "compact" layout in `src/jobsmith/resume.css` (single column, real text,
+  standard headings for ATS parsing). Recent roles get a few highlights, older ones one line;
+  `--full-roles`, `--bullets` and `--accent` adjust it, and it warns when content overflows.
 - **Developer skills** (`.claude/skills/`). `/ship` and `add-ats`.
 - **Landing.** `/jobsmith:land` lands a session's work: a squash-merged jobsmith PR first, then
   a data repo PR pointing at the squash commit, then a fast-forward of the main checkout.
 
 ## Next
 
-1. **Render resumes to PDF.** JSON Resume → PDF (Typst or HTML→PDF). `/jobsmith:apply` needs a
-   file to upload and currently asks the user for an existing PDF. Add a `tailor-resume` skill
-   on top of it.
+1. **Tailor resumes.** A `tailor-resume` skill: posting → `resumes/YYYY-MM-<company>-<role>.json`
+   (reorder, trim and rephrase highlights from `base.json`, never invent) → `resume render` →
+   one page. Then `/jobsmith:apply` uses it.
 2. **First real Workday application** with `/jobsmith:apply`. Fix what breaks via `add-ats`.
 3. **LinkedIn posting and profile skills.** Draft → user approval → post through the browser.
    Human-paced, low daily caps, stop on any CAPTCHA or unusual-activity page, never scrape.
@@ -39,3 +43,5 @@ and update it when something ships or plans change. Keep it free of personal dat
 5. **Cover letters.** Markdown drafts per application, rendered like resumes.
 6. **Validate resumes in `jobsmith check`.** It checks the profile, applications and accounts
    but not `resumes/*.json`. Validate against the JSON Resume schema (bundled, no network).
+7. **Resume fonts offline.** The layout loads Source Sans 3 from Google Fonts at render time and
+   falls back to Helvetica offline, which changes line breaks. Bundle the font files (OFL).
