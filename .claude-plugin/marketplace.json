@@ -1,0 +1,17 @@
+{
+  "name": "jobsmith",
+  "owner": {
+    "name": "Charlie Nguyen",
+    "url": "https://github.com/CharlieQNguyen"
+  },
+  "metadata": {
+    "description": "jobsmith's Claude Code plugin, served from the jobsmith checkout in your data repo"
+  },
+  "plugins": [
+    {
+      "name": "jobsmith",
+      "source": "./plugin",
+      "description": "Job search skills and a browser bridge for a jobsmith data repo"
+    }
+  ]
+}

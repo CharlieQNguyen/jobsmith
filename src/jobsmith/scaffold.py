@@ -2,10 +2,12 @@
 
 Two kinds of files:
 
-- SCAFFOLD — wiring owned by jobsmith (Claude Code settings, MCP config, git hooks, .gitignore).
+- SCAFFOLD — wiring owned by jobsmith (Claude Code settings, git hooks, .gitignore).
   Created if missing; overwritten by `--force` so `jobsmith init --force .` picks up improvements.
-  Anything that should evolve (the agent guide, the sync script) lives in the submodule and is
-  *referenced* from here, so a submodule update is usually all that's needed.
+  Anything that should evolve (the agent guide, the sync script, the Claude Code plugin with its
+  skills and MCP server) lives in the submodule and is *referenced* from here, so a submodule
+  update is usually all that's needed. The plugin comes from a local-directory marketplace at
+  the submodule, which Claude Code loads in place — no plugin update step.
 - STARTER — the user's data (profile, accounts, CLAUDE.md with personal notes). Created if
   missing, never overwritten.
 """
@@ -19,6 +21,8 @@ from pathlib import Path
 
 JOBSMITH_URL = "https://github.com/CharlieQNguyen/jobsmith.git"
 SUBMODULE_PATH = "tools/jobsmith"
+MARKETPLACE = "jobsmith"
+PLUGIN = f"jobsmith@{MARKETPLACE}"
 
 _SYNC = f"{SUBMODULE_PATH}/scripts/sync.sh"
 
@@ -38,6 +42,10 @@ def _settings(data_dir: Path) -> str:
     return json.dumps(
         {
             "env": {"JOBSMITH_DATA": str(data_dir)},
+            "extraKnownMarketplaces": {
+                MARKETPLACE: {"source": {"source": "directory", "path": str(data_dir / SUBMODULE_PATH)}}
+            },
+            "enabledPlugins": {PLUGIN: True},
             "hooks": {
                 "SessionStart": [
                     {
@@ -57,17 +65,20 @@ def _settings(data_dir: Path) -> str:
     )
 
 
-_MCP = json.dumps(
-    {
-        "mcpServers": {
-            "jobsmith-browser": {
-                "command": "npx",
-                "args": ["@playwright/mcp@latest", "--cdp-endpoint", "http://127.0.0.1:9222"],
+# Wiring from earlier jobsmith versions, removed by `init --force` if unmodified.
+_OBSOLETE: dict[str, str] = {
+    ".mcp.json": json.dumps(
+        {
+            "mcpServers": {
+                "jobsmith-browser": {
+                    "command": "npx",
+                    "args": ["@playwright/mcp@latest", "--cdp-endpoint", "http://127.0.0.1:9222"],
+                }
             }
-        }
-    },
-    indent=2,
-)
+        },
+        indent=2,
+    ),
+}
 
 _GITIGNORE = """.DS_Store
 .venv/
@@ -104,7 +115,6 @@ standard_answers:
 def scaffold_files(data_dir: Path) -> dict[str, str]:
     return {
         ".claude/settings.json": _settings(data_dir) + "\n",
-        ".mcp.json": _MCP + "\n",
         ".gitignore": _GITIGNORE,
         ".githooks/post-merge": _GIT_HOOK,
         ".githooks/post-checkout": _GIT_HOOK,
@@ -128,6 +138,7 @@ EXECUTABLE = {".githooks/post-merge", ".githooks/post-checkout"}
 class Report:
     created: list[str] = field(default_factory=list)
     updated: list[str] = field(default_factory=list)
+    removed: list[str] = field(default_factory=list)
     unchanged: list[str] = field(default_factory=list)
     kept: list[str] = field(default_factory=list)
     """Existing files left alone (differ from the template, no --force, or user data)."""
@@ -169,6 +180,15 @@ def init(root: Path, *, force: bool = False, submodule: bool = True, url: str = 
         _write(root, rel, content, overwrite=force, report=report)
     for rel, content in STARTER_FILES.items():
         _write(root, rel, content, overwrite=False, report=report)
+    for rel, old in _OBSOLETE.items():
+        path = root / rel
+        if not path.exists() or json.loads(path.read_text()) != json.loads(old):
+            continue  # absent, or the user's own file
+        if force:
+            path.unlink()
+            report.removed.append(rel)
+        else:
+            report.notes.append(f"{rel} is from an older jobsmith; `init --force` removes it")
 
     _git(root, "config", "core.hooksPath", ".githooks")
     _git(root, "config", "push.recurseSubmodules", "check")

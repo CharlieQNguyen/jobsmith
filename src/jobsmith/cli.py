@@ -38,6 +38,7 @@ def init(
     for label, paths, color in [
         ("created", r.created, "green"),
         ("updated", r.updated, "yellow"),
+        ("removed", r.removed, "yellow"),
         ("kept", r.kept, None),
     ]:
         for p in paths:

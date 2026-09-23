@@ -41,7 +41,9 @@ command, and wires up Claude Code:
 - `CLAUDE.md` imports jobsmith's [data repo guide](docs/data-repo-guide.md) (it updates with the
   submodule) and leaves room for your own notes
 - a SessionStart hook and git hooks that keep `jobsmith` installed and up to date
-- a `jobsmith-browser` MCP server so Claude can drive the browser you sign into
+- the `jobsmith` Claude Code plugin, enabled for that repo only and served from the submodule:
+  job-search skills (`/jobsmith:*`) and a `jobsmith-browser` MCP server so Claude can drive the
+  browser you sign into
 
 Run `jobsmith init --force .` later to refresh that wiring. It never touches your data.
 On another machine, clone with `git clone --recurse-submodules`.
@@ -87,13 +89,8 @@ it to the clipboard. The data repo only records that an account exists.
 keychain password. **Run it yourself** — it's the one step that touches your password. Handle
 any MFA or CAPTCHA in the window.
 
-An agent then attaches to the same browser and carries on signed in. For Claude Code, add a
-Playwright MCP server pointed at the port (in your data repo's `.mcp.json`):
-
-```json
-{ "mcpServers": { "jobsmith-browser": {
-  "command": "npx", "args": ["@playwright/mcp@latest", "--cdp-endpoint", "http://127.0.0.1:9222"] } } }
-```
+An agent then attaches to the same browser and carries on signed in. In Claude Code the jobsmith
+plugin's `jobsmith-browser` MCP server does this; other agents can use any CDP client on the port.
 
 While the port is open, any program on your machine can drive that browser. Run
 `jobsmith browser stop` when you're done.

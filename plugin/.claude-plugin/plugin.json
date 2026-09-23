@@ -1,0 +1,12 @@
+{
+  "name": "jobsmith",
+  "description": "Job search skills and a browser bridge for a jobsmith data repo: drive the Chrome you signed into with `jobsmith login`.",
+  "author": {
+    "name": "Charlie Nguyen",
+    "url": "https://github.com/CharlieQNguyen"
+  },
+  "homepage": "https://github.com/CharlieQNguyen/jobsmith",
+  "repository": "https://github.com/CharlieQNguyen/jobsmith",
+  "license": "MIT",
+  "keywords": ["job-search", "resume", "workday"]
+}

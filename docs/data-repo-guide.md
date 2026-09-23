@@ -32,14 +32,20 @@ and after git merge/checkout. `JOBSMITH_DATA` points at this repo in Claude sess
 - `jobsmith init --force .` — refresh this repo's scaffolding from the current jobsmith (never
   touches your data files)
 
+## Claude Code plugin
+
+`.claude/settings.json` registers `tools/jobsmith` as a local plugin marketplace and enables the
+`jobsmith` plugin for this repo only. It provides the `jobsmith-browser` MCP server and the
+`/jobsmith:*` skills. It loads in place from the submodule, so it always matches the pinned CLI.
+
 ## Signing in to sites
 
 1. New site: the user runs `jobsmith creds new <host> <email> --login-url <sign-in page>`, then
    pastes the clipboard password into the site's sign-up form.
 2. The user runs `jobsmith login <host>` (starts Chrome if needed, fills credentials from the
    keychain). Suggest they type it as `! jobsmith login <host>` in the chat.
-3. Claude drives that same Chrome with the `jobsmith-browser` MCP tools (`.mcp.json`, CDP on
-   127.0.0.1:9222). If those tools can't connect, ask the user to run step 2.
+3. Claude drives that same Chrome with the `jobsmith-browser` MCP tools (from the jobsmith
+   plugin, CDP on 127.0.0.1:9222). If those tools can't connect, ask the user to run step 2.
 4. `jobsmith browser stop` when done — the open DevTools port lets any local program drive Chrome.
 
 ## Rules

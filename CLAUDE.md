@@ -23,6 +23,9 @@ separate private repo that includes this one as a submodule at `tools/jobsmith`.
 - `scaffold.py` — `jobsmith init`. Data repos *reference* `docs/data-repo-guide.md` and
   `scripts/sync.sh` rather than copying them, so improvements ship via the submodule. Change
   those files here, not in a data repo.
+- `.claude-plugin/marketplace.json` + `plugin/` — the Claude Code plugin data repos enable
+  (user-facing skills in `plugin/skills/`, `jobsmith-browser` MCP server). Developer skills stay
+  in `.claude/skills/`. Validate with `claude plugin validate .`
 
 ## Commands
 
