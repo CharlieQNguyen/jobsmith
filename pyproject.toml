@@ -1,0 +1,35 @@
+[project]
+name = "jobsmith"
+version = "0.1.0"
+description = "Keep your job search in plain files and let an agent do the busywork."
+readme = "README.md"
+license = "MIT"
+authors = [
+    { name = "Charlie Nguyen", email = "13736981+CharlieQNguyen@users.noreply.github.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "keyring>=25.7.0",
+    "pydantic>=2.13.5",
+    "pyyaml>=6.0.3",
+    "typer>=0.27.2",
+]
+
+[project.scripts]
+jobsmith = "jobsmith:main"
+
+[build-system]
+requires = ["uv_build>=0.12.18,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "ruff>=0.16.8",
+]
+
+[tool.ruff]
+line-length = 110
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM"]

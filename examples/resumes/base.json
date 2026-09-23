@@ -1,0 +1,22 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jsonresume/resume-schema/v1.0.0/schema.json",
+  "basics": {
+    "name": "Alex Example",
+    "label": "Backend Engineer",
+    "email": "alex@example.com",
+    "location": { "city": "Portland", "region": "OR", "countryCode": "US" },
+    "profiles": [{ "network": "GitHub", "username": "alex-example", "url": "https://github.com/alex-example" }]
+  },
+  "work": [
+    {
+      "name": "Example Payments Inc.",
+      "position": "Software Engineer",
+      "startDate": "2022-03",
+      "highlights": [
+        "Migrated billing from a monolith to event-driven services, cutting invoice errors 40%",
+        "Built the internal API gateway used by 30+ services"
+      ]
+    }
+  ],
+  "skills": [{ "name": "Backend", "keywords": ["Python", "PostgreSQL", "Kafka", "AWS"] }]
+}

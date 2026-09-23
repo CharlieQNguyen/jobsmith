@@ -1,0 +1,12 @@
+name: Alex Example
+email: alex@example.com
+phone: "+1 555-0100"
+location: Portland, OR
+linkedin: https://www.linkedin.com/in/alex-example
+github: https://github.com/alex-example
+work_authorization: Authorized to work in the US
+requires_sponsorship: false
+standard_answers:
+  how_did_you_hear: Company careers page
+  salary_expectation: Open to discussing based on the full compensation package
+  willing_to_relocate: "No"

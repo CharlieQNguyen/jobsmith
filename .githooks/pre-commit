@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# Block commits that look like they contain real personal data.
+# jobsmith is public; personal data belongs in your private data repo.
+# Bypass (only if you're sure): git commit --no-verify
+set -euo pipefail
+
+fail=0
+staged=$(git diff --cached --name-only --diff-filter=ACM)
+[ -z "$staged" ] && exit 0
+
+# Personal-data directories must never exist at the repo root.
+if echo "$staged" | grep -E '^(profile|applications|resumes|cover-letters|linkedin)/|^accounts\.yaml$' >/dev/null; then
+  echo "✗ pre-commit: data files belong in the private repo, not jobsmith:"
+  echo "$staged" | grep -E '^(profile|applications|resumes|cover-letters|linkedin)/|^accounts\.yaml$' | sed 's/^/    /'
+  fail=1
+fi
+
+added=$(git diff --cached -U0 --diff-filter=ACM -- . ':!uv.lock' ':!.githooks/*' | grep -E '^\+[^+]' | sed 's/^+//' || true)
+
+# Emails other than example/placeholder domains.
+emails=$(echo "$added" | grep -oE '[A-Za-z0-9][A-Za-z0-9._%+-]*@[A-Za-z0-9.-]+\.[A-Za-z]{2,}' \
+  | grep -vE '@(example\.(com|org|net)|users\.noreply\.github\.com|anthropic\.com)$' || true)
+if [ -n "$emails" ]; then
+  echo "✗ pre-commit: possible real email addresses:"
+  echo "$emails" | sort -u | sed 's/^/    /'
+  fail=1
+fi
+
+# North American phone numbers not in the fictional 555-01xx range.
+phones=$(echo "$added" | grep -oE '\(?[0-9]{3}\)?[ .-]?[0-9]{3}[ .-][0-9]{4}' | grep -vE '555[ .-]01[0-9]{2}$' || true)
+if [ -n "$phones" ]; then
+  echo "✗ pre-commit: possible real phone numbers:"
+  echo "$phones" | sort -u | sed 's/^/    /'
+  fail=1
+fi
+
+exit $fail
