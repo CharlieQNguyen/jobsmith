@@ -15,6 +15,14 @@ say() { printf '{"systemMessage": "%s"}\n' "$1"; }
 [ "$(git -C "$pkg" config core.hooksPath 2>/dev/null)" = ".githooks" ] || git -C "$pkg" config core.hooksPath .githooks
 
 stamp_dir="${XDG_CACHE_HOME:-$HOME/.cache}/jobsmith"
+# In a linked worktree of the data repo, keep the global install on the main checkout: this
+# copy vanishes with the worktree. Test changes made here with `uv run --project tools/jobsmith`.
+super="$(git -C "$pkg" rev-parse --show-superproject-working-tree 2>/dev/null || true)"
+if [ -n "$super" ] && [ -x "$HOME/.local/bin/jobsmith" ] &&
+   [ "$(git -C "$super" rev-parse --git-dir)" != "$(git -C "$super" rev-parse --git-common-dir)" ]; then
+  exit 0
+fi
+
 # One stamp for the single global install: which checkout it points at + that checkout's deps.
 # If another data repo installed its copy, the path differs and we take the install back.
 stamp="$stamp_dir/installed"

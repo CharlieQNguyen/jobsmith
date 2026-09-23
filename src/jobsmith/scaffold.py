@@ -38,12 +38,21 @@ cd "$(git rev-parse --show-toplevel)" && [ -x {_SYNC} ] && {_SYNC} >/dev/null ||
 """
 
 
-def _settings(data_dir: Path) -> str:
+def main_checkout(root: Path) -> Path:
+    """The main working tree of the repo at `root`, even when `root` is a linked worktree.
+
+    The plugin marketplace is registered once per user, so it must point at a checkout that
+    outlives any worktree.
+    """
+    common = _git(root, "rev-parse", "--path-format=absolute", "--git-common-dir").stdout.strip()
+    return Path(common).parent if common.endswith("/.git") else root
+
+
+def _settings(main: Path) -> str:
     return json.dumps(
         {
-            "env": {"JOBSMITH_DATA": str(data_dir)},
             "extraKnownMarketplaces": {
-                MARKETPLACE: {"source": {"source": "directory", "path": str(data_dir / SUBMODULE_PATH)}}
+                MARKETPLACE: {"source": {"source": "directory", "path": str(main / SUBMODULE_PATH)}}
             },
             "enabledPlugins": {PLUGIN: True},
             "hooks": {
@@ -83,7 +92,7 @@ _OBSOLETE: dict[str, str] = {
 _GITIGNORE = """.DS_Store
 .venv/
 __pycache__/
-# Browser profiles hold live session cookies — never commit them
+# Old location of jobsmith's browser profile (now under ~/.local/share/jobsmith)
 .browser-profiles/
 """
 
@@ -112,9 +121,9 @@ standard_answers:
 """
 
 
-def scaffold_files(data_dir: Path) -> dict[str, str]:
+def scaffold_files(main: Path) -> dict[str, str]:
     return {
-        ".claude/settings.json": _settings(data_dir) + "\n",
+        ".claude/settings.json": _settings(main) + "\n",
         ".gitignore": _GITIGNORE,
         ".githooks/post-merge": _GIT_HOOK,
         ".githooks/post-checkout": _GIT_HOOK,
@@ -176,7 +185,7 @@ def init(root: Path, *, force: bool = False, submodule: bool = True, url: str = 
         _git(root, "init", "-q")
         report.notes.append("initialized git repo")
 
-    for rel, content in scaffold_files(root).items():
+    for rel, content in scaffold_files(main_checkout(root)).items():
         _write(root, rel, content, overwrite=force, report=report)
     for rel, content in STARTER_FILES.items():
         _write(root, rel, content, overwrite=False, report=report)

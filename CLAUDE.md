@@ -14,6 +14,8 @@ separate private repo that includes this one as a submodule at `tools/jobsmith`.
 - Data is plain files so humans and agents can edit it and diffs stay readable. Add fields to the
   pydantic models in `models.py` rather than inventing ad-hoc keys.
 
+Status and next steps: `docs/ROADMAP.md`. Read it first; update it when something ships.
+
 ## Layout
 
 - `models.py` / `store.py` — data file schemas and plain-file read/write

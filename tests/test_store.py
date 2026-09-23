@@ -58,3 +58,18 @@ def test_accounts(tmp_path):
     store.upsert_account(tmp_path, a.model_copy(update={"username": "other@example.com"}))
     assert store.find_account(tmp_path, a.host) is None  # ambiguous without a username
     assert store.find_account(tmp_path, a.host, "other@example.com").username == "other@example.com"
+
+
+def test_data_dir_prefers_nearest_data_repo(tmp_path, monkeypatch):
+    repo = tmp_path / "job-search"
+    (repo / "applications" / "deep").mkdir(parents=True)
+    (repo / "accounts.yaml").write_text("[]\n")
+    other = tmp_path / "elsewhere"
+    other.mkdir()
+
+    monkeypatch.setenv("JOBSMITH_DATA", str(other))
+    assert store.data_dir(cwd=repo / "applications" / "deep") == repo.resolve()
+    assert store.data_dir(cwd=tmp_path) == other  # outside any data repo: env
+    monkeypatch.delenv("JOBSMITH_DATA")
+    assert store.data_dir(cwd=tmp_path) == tmp_path.resolve()
+    assert store.data_dir(Path("/x"), cwd=repo) == Path("/x")

@@ -24,7 +24,7 @@ app.add_typer(browser_cmd, name="browser")
 
 DataOpt = Annotated[
     Path | None,
-    typer.Option("--data", "-d", help="Data directory (default: $JOBSMITH_DATA or cwd)"),
+    typer.Option("--data", "-d", help="Data directory (default: nearest data repo, $JOBSMITH_DATA, cwd)"),
 ]
 
 
@@ -236,10 +236,10 @@ def creds_check(host: str, username: str) -> None:
 
 
 @browser_cmd.command("start")
-def browser_start(data: DataOpt = None) -> None:
+def browser_start() -> None:
     """Launch Chrome with the jobsmith profile and a localhost DevTools port."""
     try:
-        started = browser.start(store.data_dir(data))
+        started = browser.start()
     except browser.BrowserError as e:
         typer.secho(str(e), fg="red")
         raise typer.Exit(1) from e
@@ -247,11 +247,9 @@ def browser_start(data: DataOpt = None) -> None:
 
 
 @browser_cmd.command("stop")
-def browser_stop(data: DataOpt = None) -> None:
+def browser_stop() -> None:
     """Quit the Chrome that `browser start` launched."""
-    typer.echo(
-        "Stopped." if browser.stop(store.data_dir(data)) else "Not running (or not started by jobsmith)."
-    )
+    typer.echo("Stopped." if browser.stop() else "Not running (or not started by jobsmith).")
 
 
 @browser_cmd.command("status")
@@ -291,7 +289,7 @@ def login(
         store.upsert_account(root, account)
     target = account.login_url or f"https://{host}/"
     try:
-        browser.start(root)
+        browser.start()
         typer.echo(browser.login(host, account.username, target))
     except browser.BrowserError as e:
         typer.secho(str(e), fg="red")

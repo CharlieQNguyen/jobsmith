@@ -9,7 +9,7 @@ def test_init_creates_repo_and_is_idempotent(tmp_path):
     assert "CLAUDE.md" in r.created and ".claude/settings.json" in r.created
     assert (tmp_path / ".git").is_dir()
     settings = json.loads((tmp_path / ".claude/settings.json").read_text())
-    assert settings["env"]["JOBSMITH_DATA"] == str(tmp_path.resolve())
+    assert "env" not in settings  # data dir is found from cwd, so worktrees use their own files
     assert "tools/jobsmith/scripts/sync.sh" in settings["hooks"]["SessionStart"][0]["hooks"][0]["command"]
     market = settings["extraKnownMarketplaces"]["jobsmith"]["source"]
     assert market == {"source": "directory", "path": str(tmp_path.resolve() / "tools/jobsmith")}
@@ -48,3 +48,18 @@ def test_force_removes_unmodified_obsolete_wiring(tmp_path):
     (tmp_path / ".mcp.json").write_text('{"mcpServers": {"mine": {}}}')
     assert scaffold.init(tmp_path, force=True, submodule=False).removed == []
     assert (tmp_path / ".mcp.json").exists()
+
+
+def test_marketplace_points_at_main_checkout_from_a_worktree(tmp_path):
+    main = tmp_path / "main"
+    scaffold.init(main, submodule=False)
+    git = ["git", "-C", str(main), "-c", "user.name=t", "-c", "user.email=t@example.com"]
+    subprocess.run([*git, "add", "-A"], check=True)
+    subprocess.run([*git, "commit", "-qm", "init"], check=True)
+    wt = tmp_path / "wt"
+    subprocess.run([*git, "worktree", "add", "-q", str(wt)], check=True)
+
+    scaffold.init(wt, force=True, submodule=False)
+    settings = json.loads((wt / ".claude/settings.json").read_text())
+    path = settings["extraKnownMarketplaces"]["jobsmith"]["source"]["path"]
+    assert path == str(main.resolve() / "tools/jobsmith")

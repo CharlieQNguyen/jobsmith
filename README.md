@@ -69,7 +69,9 @@ jobsmith browser start | stop | status   # the Chrome you sign into and an agent
 jobsmith login HOST [--url LOGIN_PAGE]   # sign in there with the keychain password
 ```
 
-Commands read the data directory from `--data`, then `$JOBSMITH_DATA`, then the current directory.
+Commands find the data directory from `--data`, then the nearest data repo at or above the current
+directory, then `$JOBSMITH_DATA`, then the current directory. See [the roadmap](docs/ROADMAP.md)
+for what's built and what's next.
 
 ## Supported applicant tracking systems
 
@@ -90,7 +92,7 @@ it to the clipboard. The data repo only records that an account exists.
 ## Signing in, then handing off to an agent
 
 `jobsmith browser start` launches your installed Google Chrome with its own profile
-(`.browser-profiles/` in your data repo — keep it out of git) and a DevTools port on
+(`~/.local/share/jobsmith/chrome-profile`, shared by all your data repos) and a DevTools port on
 `127.0.0.1:9222` (override with `$JOBSMITH_CDP_PORT`). Sessions persist between runs.
 
 `jobsmith login HOST` opens the account's sign-in page there and fills the username and

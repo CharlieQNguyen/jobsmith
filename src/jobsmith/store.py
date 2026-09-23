@@ -21,12 +21,21 @@ from jobsmith.models import Account, Application, Profile
 FRONTMATTER = re.compile(r"\A---\n(.*?)\n---\n?(.*)\Z", re.DOTALL)
 
 
-def data_dir(override: Path | None = None) -> Path:
+def is_data_repo(path: Path) -> bool:
+    return (path / "accounts.yaml").is_file() or (path / "profile" / "profile.yaml").is_file()
+
+
+def data_dir(override: Path | None = None, cwd: Path | None = None) -> Path:
+    """Where the data lives: --data, else the nearest data repo at or above the current directory
+    (so each git worktree uses its own files), else $JOBSMITH_DATA, else the current directory."""
     if override:
         return override
+    cwd = (cwd or Path.cwd()).resolve()
+    if found := next((d for d in (cwd, *cwd.parents) if is_data_repo(d)), None):
+        return found
     if env := os.environ.get("JOBSMITH_DATA"):
         return Path(env)
-    return Path.cwd()
+    return cwd
 
 
 def slugify(*parts: str) -> str:

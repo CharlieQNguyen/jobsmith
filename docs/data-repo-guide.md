@@ -21,9 +21,11 @@ CLAUDE.md, so it updates with the submodule.
 
 ## Commands
 
-`jobsmith` is installed as an editable uv tool from `tools/jobsmith`. `tools/jobsmith/scripts/sync.sh`
-keeps it installed and reinstalls when dependencies change; it runs on Claude Code session start
-and after git merge/checkout. `JOBSMITH_DATA` points at this repo in Claude sessions.
+`jobsmith` is installed as an editable uv tool from `tools/jobsmith` in the main checkout.
+`tools/jobsmith/scripts/sync.sh` keeps it installed and reinstalls when dependencies change; it
+runs on Claude Code session start and after git merge/checkout. Commands find the data from the
+current directory (nearest folder with `accounts.yaml`), so they act on whichever checkout or
+worktree you're in.
 
 - `jobsmith check` — validate all data files
 - `jobsmith apps add --company … --role … [--url …]` — start tracking; prints the slug
@@ -41,6 +43,20 @@ and after git merge/checkout. `JOBSMITH_DATA` points at this repo in Claude sess
 `jobsmith` plugin for this repo only. It provides the `jobsmith-browser` MCP server and the
 `/jobsmith:*` skills — `apply` (job URL → submitted application) and `track` (status news,
 follow-ups). It loads in place from the submodule, so it always matches the pinned CLI.
+
+## Sessions, worktrees and development
+
+- Sessions often run in a **git worktree** of this repo. The session-start hook checks out the
+  submodule there. Data commands act on the worktree's files, so commit there and merge to
+  `main`. The global `jobsmith` command still runs the main checkout's code. To test jobsmith
+  changes made in a worktree, use `uv run --project tools/jobsmith jobsmith …`.
+- The browser profile is per user (`~/.local/share/jobsmith/chrome-profile`), so sign-ins carry
+  over between sessions and worktrees.
+- **Project status and next steps:** `tools/jobsmith/docs/ROADMAP.md`. Read it before
+  development work and update it when something ships.
+- To hand work to a fresh session, start it in this repo, not in `tools/jobsmith`, so this guide,
+  the plugin and the hooks load. Put the task and any context not written down here in its
+  first message.
 
 ## Signing in to sites
 

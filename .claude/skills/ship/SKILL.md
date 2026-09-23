@@ -33,6 +33,8 @@ uv run pytest -q
 
 ## 3. Review what's going public
 
+- If this work ships or changes something listed in `docs/ROADMAP.md`, update it now so it's in
+  the same commit.
 - `git -C "$J" status --short` and `git -C "$J" diff --stat`. If nothing changed, say so and skip
   to step 5 (the pointer may still need committing).
 - Read the full diff. Look for anything personal: real names, emails, phone numbers,
@@ -41,6 +43,10 @@ uv run pytest -q
 - If on `main` with unrelated changes mixed together, offer to split them into separate commits.
 
 ## 4. Commit and push jobsmith
+
+A freshly checked-out submodule is on a detached HEAD. Before committing, `git -C "$J" switch main`
+and `git pull --rebase`, keeping the working-tree changes (`git stash` around it if needed).
+jobsmith changes go to its `main`.
 
 - Stage explicitly (`git add <paths>`), not `git add -A`, unless every change was reviewed above.
 - Commit message: imperative subject ≤ 72 chars, a body explaining *why* when it isn't obvious,
@@ -57,6 +63,9 @@ git -C "$P" add tools/jobsmith
 git -C "$P" commit -m "Bump jobsmith: <jobsmith commit subject>"
 git -C "$P" push
 ```
+
+If `$P` is a worktree on a branch other than `main`, the push publishes that branch. Tell the
+user it still has to be merged into `main`, or merge it if they ask.
 
 Commit only the submodule pointer here unless the user asked to include other data-repo changes.
 `push.recurseSubmodules=check` makes this push fail if step 4 didn't land. If it does, go back

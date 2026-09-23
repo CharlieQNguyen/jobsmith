@@ -1,7 +1,8 @@
 """A long-lived Chrome that the user logs into and an agent then drives.
 
-jobsmith launches the user's installed Chrome with a dedicated profile directory (so sessions
-persist between runs) and a DevTools port bound to localhost. `login()` connects over CDP and fills
+jobsmith launches the user's installed Chrome with a dedicated profile directory under
+$XDG_DATA_HOME/jobsmith (one per user, so sign-ins persist across runs, data repos and worktrees)
+and a DevTools port bound to localhost. `login()` connects over CDP and fills
 credentials from the keychain; afterwards an agent attaches to the same port (e.g. Playwright MCP
 with `--cdp-endpoint`) and continues in the signed-in tab.
 
@@ -38,9 +39,9 @@ class Paths:
     pidfile: Path
 
     @classmethod
-    def under(cls, root: Path) -> Paths:
-        base = root / ".browser-profiles"
-        return cls(profile=base / "chrome", pidfile=base / "chrome.pid")
+    def default(cls) -> Paths:
+        base = Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local" / "share") / "jobsmith"
+        return cls(profile=base / "chrome-profile", pidfile=base / "chrome.pid")
 
 
 def port() -> int:
@@ -59,13 +60,13 @@ def is_running() -> bool:
         return False
 
 
-def start(root: Path, chrome: str = CHROME) -> bool:
+def start(chrome: str = CHROME) -> bool:
     """Launch Chrome if it isn't already listening. Returns True if newly started."""
     if is_running():
         return False
     if not Path(chrome).exists():
         raise BrowserError(f"Chrome not found at {chrome}")
-    paths = Paths.under(root)
+    paths = Paths.default()
     paths.profile.mkdir(parents=True, exist_ok=True)
     proc = subprocess.Popen(
         [
@@ -88,9 +89,9 @@ def start(root: Path, chrome: str = CHROME) -> bool:
     raise BrowserError(f"Chrome started but DevTools never answered on {endpoint()}")
 
 
-def stop(root: Path) -> bool:
+def stop() -> bool:
     """Quit the Chrome that `start` launched. Returns False if none was running."""
-    pidfile = Paths.under(root).pidfile
+    pidfile = Paths.default().pidfile
     if not pidfile.exists():
         return False
     pid = int(pidfile.read_text())
