@@ -1,0 +1,25 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Workday sign-in (fake)</title>
+<div id="app">Loading…</div>
+<script>
+// Mirrors Workday's sign-in structure: late render, data-automation-id attributes, and the
+// transparent click_filter overlay that intercepts clicks on the submit button.
+setTimeout(() => {
+  app.innerHTML = `
+    <form id="f">
+      <input data-automation-id="email" type="text" aria-label="Email Address">
+      <input data-automation-id="password" type="password" aria-label="Password">
+      <div style="position:relative">
+        <button data-automation-id="signInSubmitButton" type="submit">Sign In</button>
+        <div data-automation-id="click_filter" style="position:absolute;inset:0"></div>
+      </div>
+    </form>`;
+  f.onsubmit = (e) => {
+    e.preventDefault();
+    const u = f.querySelector('[data-automation-id=email]').value;
+    const p = f.querySelector('[data-automation-id=password]').value;
+    app.innerHTML = `<output id="jobsmith-result">ok:${u}:${p.length}</output>`;
+  };
+}, 800);
+</script>

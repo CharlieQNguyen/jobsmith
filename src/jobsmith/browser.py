@@ -22,22 +22,10 @@ from pathlib import Path
 from playwright.sync_api import Page, sync_playwright
 from playwright.sync_api import TimeoutError as PlaywrightTimeout
 
-from jobsmith import credentials
+from jobsmith import ats, credentials
 
 CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 DEFAULT_PORT = 9222
-
-# Tried in order. Workday tenants share data-automation-id attributes.
-USERNAME_SELECTORS = [
-    '[data-automation-id="email"]',
-    'input[type="email"]',
-    'input[autocomplete="username"]',
-    'input[name*="user" i]',
-    'input[name*="email" i]',
-    'input[id*="user" i]',
-    'input[id*="email" i]',
-]
-PASSWORD_SELECTORS = ['[data-automation-id="password"]', 'input[type="password"]']
 
 
 class BrowserError(RuntimeError):
@@ -114,17 +102,33 @@ def stop(root: Path) -> bool:
     return True
 
 
-def _first_visible(page: Page, selectors: list[str], timeout_ms: int) -> str | None:
+def _first_visible(page: Page, selectors: tuple[str, ...], timeout_ms: int) -> str | None:
     """Wait up to timeout_ms for any selector to become visible; return the first that does."""
-    combined = ", ".join(selectors)
     try:
-        page.locator(combined).first.wait_for(state="visible", timeout=timeout_ms)
+        page.locator(", ".join(selectors)).first.wait_for(state="visible", timeout=timeout_ms)
     except PlaywrightTimeout:
         return None
-    for sel in selectors:
-        if page.locator(sel).first.is_visible():
-            return sel
-    return None
+    return next((sel for sel in selectors if page.locator(sel).first.is_visible()), None)
+
+
+def fill_login(page: Page, site: ats.ATS, username: str, password: str, timeout_ms: int = 20_000) -> str:
+    """Fill and submit the sign-in form on the current page. Returns a short status message."""
+    pw_sel = _first_visible(page, site.password_selectors, timeout_ms)
+    if pw_sel is None:
+        return "No password field appeared — maybe already signed in? Check the browser."
+    if user_sel := _first_visible(page, site.username_selectors, 2_000):
+        page.locator(user_sel).first.fill(username)
+    pw_field = page.locator(pw_sel).first
+    pw_field.fill(password)
+    if site.submit_selector:
+        page.locator(site.submit_selector).first.click()
+    else:
+        pw_field.press("Enter")
+    try:
+        pw_field.wait_for(state="hidden", timeout=timeout_ms)
+    except PlaywrightTimeout:
+        return "Submitted, but the login form is still showing — check for MFA, CAPTCHA or an error."
+    return "Signed in."
 
 
 def login(host: str, username: str, url: str, timeout_ms: int = 20_000) -> str:
@@ -145,18 +149,4 @@ def login(host: str, username: str, url: str, timeout_ms: int = 20_000) -> str:
         page.goto(url, wait_until="domcontentloaded")
         page.bring_to_front()
 
-        pw_sel = _first_visible(page, PASSWORD_SELECTORS, timeout_ms)
-        if pw_sel is None:
-            return "No password field appeared — maybe already signed in? Check the browser."
-        user_sel = _first_visible(page, USERNAME_SELECTORS, 2_000)
-        if user_sel:
-            page.locator(user_sel).first.fill(username)
-        page.locator(pw_sel).first.fill(password)
-        page.locator(pw_sel).first.press("Enter")
-
-        try:
-            page.locator(pw_sel).first.wait_for(state="hidden", timeout=timeout_ms)
-        except PlaywrightTimeout:
-            return "Submitted, but the login form is still showing — check for MFA, CAPTCHA or an error."
-        return "Signed in."
-        # Leaving the `with` block disconnects Playwright; Chrome and the tab stay open.
+        return fill_login(page, ats.for_host(host), username, password, timeout_ms)

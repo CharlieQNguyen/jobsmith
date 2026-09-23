@@ -25,15 +25,31 @@ your-private-repo/
 See [`examples/`](examples/) for the file formats. Resumes use the
 [JSON Resume](https://jsonresume.org) schema.
 
-## Install
+## Get started
+
+You need [uv](https://docs.astral.sh/uv/), git, and Google Chrome (for browser features). Then:
 
 ```bash
-uv tool install --editable tools/jobsmith   # from your private repo
+uvx --from git+https://github.com/CharlieQNguyen/jobsmith jobsmith init ~/job-search
+cd ~/job-search
+gh repo create job-search --private --source . --push   # or any private remote
 ```
+
+`jobsmith init` creates your data repo, adds jobsmith as a submodule, installs the `jobsmith`
+command, and wires up Claude Code:
+
+- `CLAUDE.md` imports jobsmith's [data repo guide](docs/data-repo-guide.md) (it updates with the
+  submodule) and leaves room for your own notes
+- a SessionStart hook and git hooks that keep `jobsmith` installed and up to date
+- a `jobsmith-browser` MCP server so Claude can drive the browser you sign into
+
+Run `jobsmith init --force .` later to refresh that wiring. It never touches your data.
+On another machine, clone with `git clone --recurse-submodules`.
 
 ## Commands
 
 ```bash
+jobsmith init [DIR] [--force]              # create or refresh a data repo
 jobsmith check                           # validate all data files
 jobsmith apps list --open                # open applications
 jobsmith apps due                        # follow-ups due today or earlier
@@ -44,6 +60,16 @@ jobsmith login HOST [--url LOGIN_PAGE]   # sign in there with the keychain passw
 ```
 
 Commands read the data directory from `--data`, then `$JOBSMITH_DATA`, then the current directory.
+
+## Supported applicant tracking systems
+
+| ATS | Hosts |
+|---|---|
+| Workday | `*.myworkdayjobs.com`, `*.myworkdaysite.com`, `*.myworkday.com` |
+| Anything else | Generic login-form detection |
+
+Adding one is a small module plus a fake sign-in page for tests; the `add-ats` Claude Code skill
+walks through it.
 
 ## Credentials
 
@@ -76,9 +102,15 @@ While the port is open, any program on your machine can drive that browser. Run
 
 ```bash
 git config core.hooksPath .githooks   # blocks commits that look like personal data
-uv run pytest
+uv run pytest                         # browser tests need Chrome; skip with -m "not browser"
 uv run ruff check
 ```
+
+Working with Claude Code in this repo gives you two skills:
+
+- `/ship` — format, lint, test, review the diff for personal data, commit and push; when jobsmith
+  is a submodule, also commit the new pointer in the data repo, in the right order
+- `add-ats` — add or fix an applicant tracking system with a fake sign-in page and a headless test
 
 ## License
 

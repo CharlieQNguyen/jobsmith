@@ -1,0 +1,15 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Generic sign-in (fake)</title>
+<form id="f">
+  <label>Username <input name="username" type="text"></label>
+  <label>Password <input name="password" type="password"></label>
+  <button>Log in</button>
+</form>
+<script>
+f.onsubmit = (e) => {
+  e.preventDefault();
+  const u = f.username.value, p = f.password.value;
+  document.body.innerHTML = `<output id="jobsmith-result">ok:${u}:${p.length}</output>`;
+};
+</script>

@@ -10,7 +10,7 @@ from typing import Annotated
 
 import typer
 
-from jobsmith import browser, credentials, store
+from jobsmith import browser, credentials, scaffold, store
 from jobsmith.models import Account, Status
 
 app = typer.Typer(no_args_is_help=True, help="Keep your job search in plain files.")
@@ -25,6 +25,28 @@ DataOpt = Annotated[
     Path | None,
     typer.Option("--data", "-d", help="Data directory (default: $JOBSMITH_DATA or cwd)"),
 ]
+
+
+@app.command()
+def init(
+    directory: Annotated[Path, typer.Argument(help="Data repo to create or refresh")] = Path("."),
+    force: Annotated[bool, typer.Option(help="Overwrite jobsmith-owned wiring (never your data)")] = False,
+    submodule: Annotated[bool, typer.Option(help="Add jobsmith as a submodule at tools/jobsmith")] = True,
+) -> None:
+    """Create a private data repo wired up for jobsmith and Claude Code, or refresh one."""
+    r = scaffold.init(directory, force=force, submodule=submodule)
+    for label, paths, color in [
+        ("created", r.created, "green"),
+        ("updated", r.updated, "yellow"),
+        ("kept", r.kept, None),
+    ]:
+        for p in paths:
+            typer.secho(f"  {label:<8} {p}", fg=color)
+    for note in r.notes:
+        typer.echo(f"  • {note}")
+    if r.kept and not force:
+        typer.echo("Kept files differ from the template; `jobsmith init --force` refreshes wiring files.")
+    typer.echo("Next: fill in profile/profile.yaml, then open Claude Code in this directory.")
 
 
 @app.command()
