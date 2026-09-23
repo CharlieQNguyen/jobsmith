@@ -32,16 +32,35 @@ and update it when something ships or plans change. Keep it free of personal dat
 
 ## Next
 
-1. **Tailor resumes.** A `tailor-resume` skill: posting → `resumes/YYYY-MM-<company>-<role>.json`
+The data repo is the source of truth for applications. Items 1–3 build on it.
+
+1. **Import applications from a spreadsheet.** `jobsmith apps import FILE.csv`: map common
+   headers (date, company, job title/role, link/website/url, notes, req/rec id), take a
+   `--date-format` (e.g. `%d-%m-%Y`), turn LinkedIn tracking URLs into `linkedin.com/jobs/view/<id>`,
+   create each row as `applied` on its date with the note in the Markdown body (rows whose note
+   says the user hasn't applied yet become `interested`), and be idempotent: skip a row whose
+   company, role and URL already exist; disambiguate repeat company/role pairs by date. Print a
+   summary and dry-run with `--dry-run`. The user exports the CSV (File → Download); don't scrape it.
+2. **Inbox sweep via the Gmail connector.** A `/jobsmith:inbox` skill (no credentials in
+   jobsmith: it uses Claude's Gmail connector). Search mail since the last sweep for ATS senders
+   (greenhouse, lever, ashby, workday, icims, smartrecruiters, …) and application subjects
+   (thank you for applying, unfortunately, next steps, interview, schedule). Match to
+   applications by company, show a table of proposed updates (status, event, contact), apply only
+   approved ones with `apps update`, and record the sweep time in the data repo. Read-only on
+   mail. Afterwards, optionally offer to mark long-silent applications `ghosted` (show the count
+   and threshold first).
+3. **Follow-ups.** A `/jobsmith:followups` skill for `apps due` items and follow-up intentions in
+   application notes: drafts each message as a **Gmail draft** for the user to review and send
+   (never sends). Optionally a daily scheduled sweep + summary, and a SessionStart line for what's
+   due.
+4. **Tailor resumes.** A `tailor-resume` skill: posting → `resumes/YYYY-MM-<company>-<role>.json`
    (reorder, trim and rephrase highlights from `base.json`, never invent) → `resume render` →
    one page. Then `/jobsmith:apply` uses it.
-2. **First real Workday application** with `/jobsmith:apply`. Fix what breaks via `add-ats`.
-3. **LinkedIn posting and profile skills.** Draft → user approval → post through the browser.
+5. **First real Workday application** with `/jobsmith:apply`. Fix what breaks via `add-ats`.
+6. **LinkedIn posting and profile skills.** Draft → user approval → post through the browser.
    Human-paced, low daily caps, stop on any CAPTCHA or unusual-activity page, never scrape.
-4. **Follow-ups.** A `followups` skill that drafts messages for `apps due` items (never sends
-   without approval), plus optionally a SessionStart summary of what's due.
-5. **Cover letters.** Markdown drafts per application, rendered like resumes.
-6. **Validate resumes in `jobsmith check`.** It checks the profile, applications and accounts
+7. **Cover letters.** Markdown drafts per application, rendered like resumes.
+8. **Validate resumes in `jobsmith check`.** It checks the profile, applications and accounts
    but not `resumes/*.json`. Validate against the JSON Resume schema (bundled, no network).
-7. **Resume fonts offline.** The layout loads Source Sans 3 from Google Fonts at render time and
+9. **Resume fonts offline.** The layout loads Source Sans 3 from Google Fonts at render time and
    falls back to Helvetica offline, which changes line breaks. Bundle the font files (OFL).
