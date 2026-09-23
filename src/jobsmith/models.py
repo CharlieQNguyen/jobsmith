@@ -70,7 +70,7 @@ class Profile(BaseModel):
     website: HttpUrl | None = None
     work_authorization: str | None = None
     requires_sponsorship: bool | None = None
-    standard_answers: dict[str, str] = Field(
+    standard_answers: dict[str, str | None] = Field(
         default_factory=dict,
         description="Reusable answers to common application questions, keyed by a short name",
     )
