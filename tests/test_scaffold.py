@@ -19,6 +19,11 @@ def test_init_creates_repo_and_is_idempotent(tmp_path):
         ["git", "-C", str(tmp_path), "config", "core.hooksPath"], capture_output=True, text=True
     ).stdout.strip()
     assert hooks_path == ".githooks"
+    recurse = subprocess.run(
+        ["git", "-C", str(tmp_path), "config", "submodule.recurse"], capture_output=True, text=True
+    ).stdout.strip()
+    assert recurse == "true"
+    assert ".claude/worktrees/" in (tmp_path / ".gitignore").read_text()
 
     again = scaffold.init(tmp_path, submodule=False)
     assert not again.created and not again.updated and not again.kept

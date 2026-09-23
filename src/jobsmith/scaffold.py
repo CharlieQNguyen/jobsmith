@@ -92,6 +92,8 @@ _OBSOLETE: dict[str, str] = {
 _GITIGNORE = """.DS_Store
 .venv/
 __pycache__/
+# Claude Code session worktrees
+.claude/worktrees/
 # Old location of jobsmith's browser profile (now under ~/.local/share/jobsmith)
 .browser-profiles/
 """
@@ -201,6 +203,7 @@ def init(root: Path, *, force: bool = False, submodule: bool = True, url: str = 
 
     _git(root, "config", "core.hooksPath", ".githooks")
     _git(root, "config", "push.recurseSubmodules", "check")
+    _git(root, "config", "submodule.recurse", "true")  # pull/checkout move tools/jobsmith too
 
     if submodule and not (root / SUBMODULE_PATH / "pyproject.toml").exists():
         added = _git(root, "submodule", "add", "-q", url, SUBMODULE_PATH)
