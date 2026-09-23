@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import os
 import re
+from datetime import date, timedelta
 from pathlib import Path
 
 import yaml
@@ -31,6 +32,18 @@ def data_dir(override: Path | None = None) -> Path:
 def slugify(*parts: str) -> str:
     text = "-".join(parts).lower()
     return re.sub(r"[^a-z0-9]+", "-", text).strip("-")
+
+
+def parse_date(text: str, today: date | None = None) -> date:
+    """`today`, `+3d`, `+2w`, or an ISO date."""
+    today = today or date.today()
+    text = text.strip().lower()
+    if text == "today":
+        return today
+    if m := re.fullmatch(r"\+(\d+)([dw])", text):
+        n = int(m[1]) * (7 if m[2] == "w" else 1)
+        return today + timedelta(days=n)
+    return date.fromisoformat(text)
 
 
 def load_profile(root: Path) -> Profile:
@@ -82,3 +95,23 @@ def find_account(root: Path, host: str, username: str | None = None) -> Account 
 def upsert_account(root: Path, account: Account) -> None:
     accounts = [a for a in load_accounts(root) if (a.host, a.username) != (account.host, account.username)]
     save_accounts(root, [*accounts, account])
+
+
+def resolve_application(root: Path, query: str) -> str:
+    """Slug for `query`: an exact slug, or a unique case-insensitive match on slug/company/role.
+
+    Raises LookupError listing the candidates when there are none or several.
+    """
+    apps = load_applications(root)
+    if query in apps:
+        return query
+    words = query.lower().split()
+    hits = [
+        slug for slug, a in apps.items() if all(w in f"{slug} {a.company} {a.role}".lower() for w in words)
+    ]
+    if len(hits) == 1:
+        return hits[0]
+    raise LookupError(
+        f"{'No' if not hits else 'Several'} applications match {query!r}"
+        + (": " + ", ".join(hits) if hits else "")
+    )

@@ -26,7 +26,10 @@ keeps it installed and reinstalls when dependencies change; it runs on Claude Co
 and after git merge/checkout. `JOBSMITH_DATA` points at this repo in Claude sessions.
 
 - `jobsmith check` — validate all data files
-- `jobsmith apps list --open`
+- `jobsmith apps add --company … --role … [--url …]` — start tracking; prints the slug
+- `jobsmith apps update <slug or words> [--status …] [--event "…"] [--on DATE] [--followup +7d|DATE|none]`
+  — prefer this to hand-editing frontmatter; status changes are logged as events
+- `jobsmith apps list --open`, `jobsmith apps show <query>`
 - `jobsmith apps due` — follow-ups due
 - `jobsmith browser status` — is the signed-in Chrome up?
 - `jobsmith init --force .` — refresh this repo's scaffolding from the current jobsmith (never
@@ -36,7 +39,8 @@ and after git merge/checkout. `JOBSMITH_DATA` points at this repo in Claude sess
 
 `.claude/settings.json` registers `tools/jobsmith` as a local plugin marketplace and enables the
 `jobsmith` plugin for this repo only. It provides the `jobsmith-browser` MCP server and the
-`/jobsmith:*` skills. It loads in place from the submodule, so it always matches the pinned CLI.
+`/jobsmith:*` skills — `apply` (job URL → submitted application) and `track` (status news,
+follow-ups). It loads in place from the submodule, so it always matches the pinned CLI.
 
 ## Signing in to sites
 

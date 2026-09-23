@@ -7,11 +7,12 @@ import subprocess
 from datetime import date
 from pathlib import Path
 from typing import Annotated
+from urllib.parse import urlparse
 
 import typer
 
-from jobsmith import browser, credentials, scaffold, store
-from jobsmith.models import Account, Status
+from jobsmith import ats, browser, credentials, scaffold, store
+from jobsmith.models import Account, Application, Event, Status
 
 app = typer.Typer(no_args_is_help=True, help="Keep your job search in plain files.")
 apps_cmd = typer.Typer(no_args_is_help=True, help="Job applications.")
@@ -86,6 +87,88 @@ def apps_list(
             continue
         followup = f"  follow up {a.next_followup}" if a.next_followup and a.status.is_open else ""
         typer.echo(f"{a.status:<13} {a.company} — {a.role}  [{slug}]{followup}")
+
+
+def _resolve(root: Path, query: str) -> str:
+    try:
+        return store.resolve_application(root, query)
+    except LookupError as e:
+        typer.secho(str(e), fg="red")
+        raise typer.Exit(1) from e
+
+
+def _when(text: str) -> date:
+    try:
+        return store.parse_date(text)
+    except ValueError as e:
+        typer.secho(f"Bad date {text!r}: use today, +3d, +2w or YYYY-MM-DD", fg="red")
+        raise typer.Exit(1) from e
+
+
+@apps_cmd.command("add")
+def apps_add(
+    company: Annotated[str, typer.Option(help="Employer name")],
+    role: Annotated[str, typer.Option(help="Job title as posted")],
+    url: Annotated[str | None, typer.Option(help="Posting URL")] = None,
+    status: Annotated[Status, typer.Option(help="Starting status")] = Status.INTERESTED,
+    data: DataOpt = None,
+) -> None:
+    """Start tracking an application. Prints its slug."""
+    root = store.data_dir(data)
+    slug = store.slugify(company, role)
+    if slug in store.load_applications(root):
+        typer.secho(f"Already tracked: {slug}", fg="yellow")
+        raise typer.Exit(1)
+    site = None
+    if url and (host := urlparse(url).hostname):
+        detected = ats.for_host(host)
+        site = None if detected is ats.GENERIC else detected.name
+    today = date.today()
+    app_ = Application(company=company, role=role, url=url, ats=site)
+    app_.events.append(Event(when=today, what="Started tracking"))
+    app_.set_status(status, today)
+    store.write_application(root, app_, slug)
+    typer.echo(slug)
+
+
+@apps_cmd.command("update")
+def apps_update(
+    query: Annotated[str, typer.Argument(help="Slug, or words matching company/role")],
+    status: Annotated[Status | None, typer.Option(help="New status (logged as an event)")] = None,
+    event: Annotated[str | None, typer.Option(help="Something that happened, e.g. 'Phone screen'")] = None,
+    on: Annotated[str, typer.Option(help="When it happened: today, +3d, YYYY-MM-DD")] = "today",
+    followup: Annotated[str | None, typer.Option(help="Next follow-up: +7d, YYYY-MM-DD, or none")] = None,
+    resume: Annotated[str | None, typer.Option(help="Resume file sent")] = None,
+    cover_letter: Annotated[str | None, typer.Option(help="Cover letter sent")] = None,
+    data: DataOpt = None,
+) -> None:
+    """Update an application's status, log an event, or set the next follow-up."""
+    root = store.data_dir(data)
+    slug = _resolve(root, query)
+    a = store.read_application(root / "applications" / f"{slug}.md")
+    when = _when(on)
+    if status:
+        a.set_status(status, when)
+    if event:
+        a.events.append(Event(when=when, what=event))
+    if followup:
+        a.next_followup = None if followup.lower() == "none" else _when(followup)
+    if resume:
+        a.resume = resume
+    if cover_letter:
+        a.cover_letter = cover_letter
+    store.write_application(root, a, slug)
+    nxt = f", follow up {a.next_followup}" if a.next_followup else ""
+    typer.echo(f"{slug}: {a.status}{nxt}")
+
+
+@apps_cmd.command("show")
+def apps_show(query: str, data: DataOpt = None) -> None:
+    """Print an application's file."""
+    root = store.data_dir(data)
+    path = root / "applications" / f"{_resolve(root, query)}.md"
+    typer.echo(f"# {path.relative_to(root)}\n")
+    typer.echo(path.read_text())
 
 
 @apps_cmd.command("due")

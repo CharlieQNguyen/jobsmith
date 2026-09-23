@@ -45,6 +45,11 @@ command, and wires up Claude Code:
   job-search skills (`/jobsmith:*`) and a `jobsmith-browser` MCP server so Claude can drive the
   browser you sign into
 
+| Skill | What it does |
+|---|---|
+| `/jobsmith:apply <url>` | Records the job, gets you signed in, fills the application from your profile, and submits only when you say so |
+| `/jobsmith:track <news>` | "Acme rejected me", "screen with Globex Tuesday", "what's due?" |
+
 Run `jobsmith init --force .` later to refresh that wiring. It never touches your data.
 On another machine, clone with `git clone --recurse-submodules`.
 
@@ -53,6 +58,9 @@ On another machine, clone with `git clone --recurse-submodules`.
 ```bash
 jobsmith init [DIR] [--force]              # create or refresh a data repo
 jobsmith check                           # validate all data files
+jobsmith apps add --company C --role R [--url URL]   # start tracking (detects the ATS)
+jobsmith apps update QUERY [--status S] [--event TEXT] [--followup +7d]
+jobsmith apps show QUERY                 # QUERY: slug or words from company/role
 jobsmith apps list --open                # open applications
 jobsmith apps due                        # follow-ups due today or earlier
 jobsmith creds new HOST USERNAME         # generate a password, keep it in the keychain, copy it

@@ -53,6 +53,18 @@ class Application(BaseModel):
     events: list[Event] = []
     notes: str = Field(default="", exclude=True)
 
+    def set_status(self, new: Status, on: date) -> bool:
+        """Change status, logging it as an event. Returns False if it was already `new`."""
+        if new == self.status:
+            return False
+        self.events.append(Event(when=on, what=f"Status: {self.status} → {new}"))
+        self.status = new
+        if new == Status.APPLIED and self.applied_on is None:
+            self.applied_on = on
+        if not new.is_open:
+            self.next_followup = None
+        return True
+
     def followup_due(self, today: date | None = None) -> bool:
         today = today or date.today()
         return self.status.is_open and self.next_followup is not None and self.next_followup <= today
