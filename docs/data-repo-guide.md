@@ -41,8 +41,9 @@ worktree you're in.
 
 `.claude/settings.json` registers `tools/jobsmith` as a local plugin marketplace and enables the
 `jobsmith` plugin for this repo only. It provides the `jobsmith-browser` MCP server and the
-`/jobsmith:*` skills — `apply` (job URL → submitted application) and `track` (status news,
-follow-ups). It loads in place from the submodule, so it always matches the pinned CLI.
+`/jobsmith:*` skills — `apply` (job URL → submitted application), `track` (status news,
+follow-ups) and `import-linkedin` (seed the profile and base resume from your LinkedIn). It
+loads in place from the submodule, so it always matches the pinned CLI.
 
 ## Sessions, worktrees and development
 
