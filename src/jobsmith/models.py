@@ -74,3 +74,12 @@ class Profile(BaseModel):
         default_factory=dict,
         description="Reusable answers to common application questions, keyed by a short name",
     )
+
+
+class Account(BaseModel):
+    """A site account. The password lives in the OS keychain, never here."""
+
+    host: str
+    username: str
+    created: date
+    login_url: str | None = None

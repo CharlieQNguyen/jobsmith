@@ -42,3 +42,19 @@ def test_generate_password_meets_common_rules():
         assert len(pw) == 24
         assert any(c.isupper() for c in pw) and any(c.islower() for c in pw)
         assert any(c.isdigit() for c in pw) and any(not c.isalnum() for c in pw)
+
+
+def test_accounts(tmp_path):
+    from jobsmith.models import Account
+
+    assert store.find_account(tmp_path, "acme.wd5.myworkdayjobs.com") is None
+    a = Account(host="acme.wd5.myworkdayjobs.com", username="alex@example.com", created=date(2026, 9, 1))
+    store.upsert_account(tmp_path, a)
+    a.login_url = "https://acme.wd5.myworkdayjobs.com/en-US/careers/login"
+    store.upsert_account(tmp_path, a)
+    assert store.load_accounts(tmp_path) == [a]
+    assert store.find_account(tmp_path, "ACME.wd5.myworkdayjobs.com") == a
+
+    store.upsert_account(tmp_path, a.model_copy(update={"username": "other@example.com"}))
+    assert store.find_account(tmp_path, a.host) is None  # ambiguous without a username
+    assert store.find_account(tmp_path, a.host, "other@example.com").username == "other@example.com"

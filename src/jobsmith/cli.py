@@ -9,16 +9,17 @@ from pathlib import Path
 from typing import Annotated
 
 import typer
-import yaml
 
-from jobsmith import credentials, store
-from jobsmith.models import Status
+from jobsmith import browser, credentials, store
+from jobsmith.models import Account, Status
 
 app = typer.Typer(no_args_is_help=True, help="Keep your job search in plain files.")
 apps_cmd = typer.Typer(no_args_is_help=True, help="Job applications.")
 creds_cmd = typer.Typer(no_args_is_help=True, help="Site credentials in the OS keychain.")
+browser_cmd = typer.Typer(no_args_is_help=True, help="The Chrome that you log into and an agent drives.")
 app.add_typer(apps_cmd, name="apps")
 app.add_typer(creds_cmd, name="creds")
+app.add_typer(browser_cmd, name="browser")
 
 DataOpt = Annotated[
     Path | None,
@@ -83,27 +84,24 @@ def _copy_to_clipboard(text: str) -> bool:
     return True
 
 
-def _record_account(root: Path, host: str, username: str) -> None:
-    path = root / "accounts.yaml"
-    accounts = (yaml.safe_load(path.read_text()) if path.exists() else None) or []
-    if not any(a["host"] == host and a["username"] == username for a in accounts):
-        accounts.append({"host": host, "username": username, "created": date.today().isoformat()})
-        path.write_text(yaml.safe_dump(accounts, sort_keys=False))
-
-
 @creds_cmd.command("new")
 def creds_new(
     host: Annotated[str, typer.Argument(help="Site host, e.g. acme.wd5.myworkdayjobs.com")],
     username: str,
+    login_url: Annotated[str | None, typer.Option(help="Page with the sign-in form")] = None,
     data: DataOpt = None,
 ) -> None:
     """Generate a password, store it in the keychain, and copy it to the clipboard."""
+    host = host.lower()
     if credentials.exists(host, username):
         typer.secho(f"{username}@{host} already has a stored password.", fg="yellow")
         raise typer.Exit(1)
     pw = credentials.generate_password()
     credentials.store(host, username, pw)
-    _record_account(store.data_dir(data), host, username)
+    store.upsert_account(
+        store.data_dir(data),
+        Account(host=host, username=username, created=date.today(), login_url=login_url),
+    )
     if _copy_to_clipboard(pw):
         typer.echo("Stored in keychain and copied to clipboard — paste it into the sign-up form.")
     else:
@@ -129,3 +127,66 @@ def creds_check(host: str, username: str) -> None:
     ok = credentials.exists(host, username)
     typer.echo(f"{username}@{host}: {'stored' if ok else 'missing'}")
     raise typer.Exit(0 if ok else 1)
+
+
+@browser_cmd.command("start")
+def browser_start(data: DataOpt = None) -> None:
+    """Launch Chrome with the jobsmith profile and a localhost DevTools port."""
+    try:
+        started = browser.start(store.data_dir(data))
+    except browser.BrowserError as e:
+        typer.secho(str(e), fg="red")
+        raise typer.Exit(1) from e
+    typer.echo(f"{'Started' if started else 'Already running'} — DevTools at {browser.endpoint()}")
+
+
+@browser_cmd.command("stop")
+def browser_stop(data: DataOpt = None) -> None:
+    """Quit the Chrome that `browser start` launched."""
+    typer.echo(
+        "Stopped." if browser.stop(store.data_dir(data)) else "Not running (or not started by jobsmith)."
+    )
+
+
+@browser_cmd.command("status")
+def browser_status() -> None:
+    """Is the browser up?"""
+    up = browser.is_running()
+    typer.echo(f"{'Running' if up else 'Not running'} ({browser.endpoint()})")
+    raise typer.Exit(0 if up else 1)
+
+
+@app.command()
+def login(
+    host: Annotated[str, typer.Argument(help="Site host, as used with `creds new`")],
+    username: Annotated[
+        str | None, typer.Option("--user", "-u", help="Needed if the site has several")
+    ] = None,
+    url: Annotated[str | None, typer.Option(help="Sign-in page; saved for next time")] = None,
+    data: DataOpt = None,
+) -> None:
+    """Sign in to a site in the jobsmith browser using the keychain password.
+
+    Run this yourself — it's the step that handles your password. Starts the browser if needed.
+    """
+    root = store.data_dir(data)
+    host = host.lower()
+    account = store.find_account(root, host, username)
+    if account is None:
+        typer.secho(
+            f"No single account for {host}"
+            + (f" / {username}" if username else "")
+            + " in accounts.yaml. Add one with `jobsmith creds new`, or pass --user.",
+            fg="red",
+        )
+        raise typer.Exit(1)
+    if url and url != account.login_url:
+        account.login_url = url
+        store.upsert_account(root, account)
+    target = account.login_url or f"https://{host}/"
+    try:
+        browser.start(root)
+        typer.echo(browser.login(host, account.username, target))
+    except browser.BrowserError as e:
+        typer.secho(str(e), fg="red")
+        raise typer.Exit(1) from e
