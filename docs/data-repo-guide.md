@@ -47,7 +47,7 @@ follow-ups). It loads in place from the submodule, so it always matches the pinn
 ## Sessions, worktrees and development
 
 - Sessions often run in a **git worktree** of this repo. The session-start hook checks out the
-  submodule there. Data commands act on the worktree's files, so commit there and merge to
+  submodule there. Data commands act on the worktree's files; `/jobsmith:land` gets them to
   `main`. The global `jobsmith` command still runs the main checkout's code. To test jobsmith
   changes made in a worktree, use `uv run --project tools/jobsmith jobsmith …`.
 - The browser profile is per user (`~/.local/share/jobsmith/chrome-profile`), so sign-ins carry
@@ -56,7 +56,7 @@ follow-ups). It loads in place from the submodule, so it always matches the pinn
   development work and update it when something ships.
 - To hand work to a fresh session, start it in this repo, not in `tools/jobsmith`, so this guide,
   the plugin and the hooks load. Put the task and any context not written down here in its
-  first message.
+  first message, and end it with "finish with /jobsmith:land".
 
 ## Signing in to sites
 
@@ -72,9 +72,9 @@ follow-ups). It loads in place from the submodule, so it always matches the pinn
 
 - `tools/jobsmith` is **public**. Never copy anything from this repo into it. Its pre-commit hook
   blocks obvious leaks; don't rely on it.
-- When changing jobsmith: commit and push inside `tools/jobsmith` first, then commit the updated
-  submodule pointer here (the `ship` skill does this). `push.recurseSubmodules=check` refuses a
-  push that gets the order wrong.
+- **Every change lands through a PR, squash-merged**, in both repos. Finish every working session
+  with `/jobsmith:land`: it lands jobsmith first, repoints `tools/jobsmith` at the squash
+  commit, then lands this repo, and updates the main checkout. Don't push to `main` directly.
 - Credentials: never read, print, or type passwords, and never run `jobsmith login` or
   `jobsmith creds copy` — those are the user's steps. Claude takes over after login.
 - Browser actions on third-party sites (Workday, LinkedIn): confirm before entering personal data

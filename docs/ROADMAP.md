@@ -19,6 +19,8 @@ and update it when something ships or plans change. Keep it free of personal dat
 - **Claude Code plugin** (`plugin/`, root `.claude-plugin/marketplace.json`). The
   `jobsmith-browser` MCP server plus the `/jobsmith:apply` and `/jobsmith:track` skills.
 - **Developer skills** (`.claude/skills/`). `/ship` and `add-ats`.
+- **Landing.** `/jobsmith:land` lands a session's work: a squash-merged jobsmith PR first, then
+  a data repo PR pointing at the squash commit, then a fast-forward of the main checkout.
 
 ## Next
 

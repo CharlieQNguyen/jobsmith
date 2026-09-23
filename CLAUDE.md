@@ -36,4 +36,6 @@ Status and next steps: `docs/ROADMAP.md`. Read it first; update it when somethin
 - `uv run ruff check && uv run ruff format --check` — lint
 - `uv run jobsmith --data examples apps list` — try the CLI against example data
 
-Ship changes with `/ship` — it handles the jobsmith-then-data-repo push order.
+Changes land through squash-merged PRs. Standalone, use `/ship`. From a data repo, use
+`/jobsmith:land`, which lands jobsmith first and then repoints the data repo's submodule at the
+squash commit.
