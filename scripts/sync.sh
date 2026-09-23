@@ -15,8 +15,10 @@ say() { printf '{"systemMessage": "%s"}\n' "$1"; }
 [ "$(git -C "$pkg" config core.hooksPath 2>/dev/null)" = ".githooks" ] || git -C "$pkg" config core.hooksPath .githooks
 
 stamp_dir="${XDG_CACHE_HOME:-$HOME/.cache}/jobsmith"
-stamp="$stamp_dir/deps-$(printf '%s' "$pkg" | shasum -a 256 | cut -c1-12).sha"
-want="$(cat "$pkg/pyproject.toml" "$pkg/uv.lock" | shasum -a 256 | cut -d' ' -f1)"
+# One stamp for the single global install: which checkout it points at + that checkout's deps.
+# If another data repo installed its copy, the path differs and we take the install back.
+stamp="$stamp_dir/installed"
+want="$pkg $(cat "$pkg/pyproject.toml" "$pkg/uv.lock" | shasum -a 256 | cut -d' ' -f1)"
 have="$(cat "$stamp" 2>/dev/null || true)"
 
 if [ "$want" != "$have" ] || [ ! -x "$HOME/.local/bin/jobsmith" ]; then
