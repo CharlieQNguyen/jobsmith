@@ -48,6 +48,7 @@ command, and wires up Claude Code:
 | Skill | What it does |
 |---|---|
 | `/jobsmith:apply <url>` | Records the job, gets you signed in, fills the application from your profile, and submits only when you say so |
+| `/jobsmith:import-linkedin` | Reads your own LinkedIn profile (a few pages, human-paced) and fills your profile and base resume after you review it |
 | `/jobsmith:track <news>` | "Acme rejected me", "screen with Globex Tuesday", "what's due?" |
 | `/jobsmith:land` | End of session: squash-merge PRs (jobsmith first, then your data repo) and update your main checkout |
 
