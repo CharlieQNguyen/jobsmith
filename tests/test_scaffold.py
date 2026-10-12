@@ -156,3 +156,18 @@ def test_session_start_hook_reports_drift_as_one_system_message(tmp_path):
     )
     message = json.loads(drift.stdout)["systemMessage"]
     assert message.count("jobsmith:") == 2 and "\n" in message
+
+
+def test_gitignore_keeps_other_tools_lines(tmp_path):
+    scaffold.init(tmp_path)
+    gitignore = tmp_path / ".gitignore"
+    gitignore.write_text(gitignore.read_text() + "/.sessions/\n/projects/\n")  # another tool's lines
+    assert scaffold.stale(tmp_path) == []
+
+    gitignore.write_text("/.sessions/\n.DS_Store\n")  # jobsmith's other lines are gone
+    assert scaffold.stale(tmp_path) == [".gitignore"]
+    scaffold.init(tmp_path, force=True)
+    lines = gitignore.read_text().splitlines()
+    assert lines[:2] == ["/.sessions/", ".DS_Store"]
+    assert ".claude/worktrees/" in lines and lines.count(".DS_Store") == 1
+    assert scaffold.stale(tmp_path) == []

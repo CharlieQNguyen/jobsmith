@@ -146,8 +146,24 @@ def _same(rel: str, a: str, b: str) -> bool:
     return json.loads(a) == json.loads(b) if rel.endswith(".json") else a == b
 
 
+# Files other tools write to as well. jobsmith owns only its own lines in them: it adds the ones
+# that are missing and leaves every other line alone.
+SHARED = {".gitignore"}
+
+
+def _patterns(text: str) -> list[str]:
+    return [line for line in text.splitlines() if line.strip() and not line.startswith("#")]
+
+
 def _write(root: Path, rel: str, content: str, *, overwrite: bool, dry_run: bool, report: Report) -> None:
     path = root / rel
+    if path.exists() and rel in SHARED:
+        have = path.read_text()
+        missing = [p for p in _patterns(content) if p not in _patterns(have)]
+        if not missing:
+            report.unchanged.append(rel)
+            return
+        content = have + ("" if have.endswith("\n") or not have else "\n") + "\n".join(missing) + "\n"
     if path.exists():
         if path.read_text() == content:
             report.unchanged.append(rel)
