@@ -5,7 +5,7 @@
     "url": "https://github.com/CharlieQNguyen"
   },
   "metadata": {
-    "description": "jobsmith's Claude Code plugin, served from the jobsmith checkout in your data repo"
+    "description": "jobsmith's Claude Code plugin, for a jobsmith data repo"
   },
   "plugins": [
     {

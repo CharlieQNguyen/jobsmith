@@ -1,15 +1,17 @@
-"""`jobsmith init`: create or refresh a private data repo that uses jobsmith as a submodule.
+"""`jobsmith init`: create or refresh a private data repo wired up for jobsmith.
 
 Two kinds of files:
 
-- SCAFFOLD — wiring owned by jobsmith (Claude Code settings, git hooks, .gitignore).
+- SCAFFOLD — wiring owned by jobsmith (Claude Code settings, the agent guide, .gitignore).
   Created if missing; overwritten by `--force` so `jobsmith init --force .` picks up improvements.
-  Anything that should evolve (the agent guide, the sync script, the Claude Code plugin with its
-  skills and MCP server) lives in the submodule and is *referenced* from here, so a submodule
-  update is usually all that's needed. The plugin comes from a local-directory marketplace at
-  the submodule, which Claude Code loads in place — no plugin update step.
+  The agent guide ships inside the package, so the copy written here always matches the installed
+  CLI. The Claude Code plugin comes from jobsmith's GitHub marketplace; its SessionStart hook runs
+  `jobsmith init --check` and says when this wiring is out of date.
 - STARTER — the user's data (profile, accounts, CLAUDE.md with personal notes). Created if
   missing, never overwritten.
+
+The data repo holds no copy of jobsmith itself: the CLI is a uv tool and the plugin is installed
+by Claude Code, so a data repo is plain files that any checkout or worktree of it can use.
 """
 
 from __future__ import annotations
@@ -17,62 +19,39 @@ from __future__ import annotations
 import json
 import subprocess
 from dataclasses import dataclass, field
+from importlib.resources import files
 from pathlib import Path
 
-JOBSMITH_URL = "https://github.com/CharlieQNguyen/jobsmith.git"
-SUBMODULE_PATH = "tools/jobsmith"
+from jobsmith import __version__
+
+JOBSMITH_REPO = "CharlieQNguyen/jobsmith"
 MARKETPLACE = "jobsmith"
 PLUGIN = f"jobsmith@{MARKETPLACE}"
-
-_SYNC = f"{SUBMODULE_PATH}/scripts/sync.sh"
-
-# Fresh clones without --recurse-submodules: check the submodule out first, then sync.
-_SESSION_START = (
-    'cd "$CLAUDE_PROJECT_DIR" && '
-    f"{{ [ -f {SUBMODULE_PATH}/pyproject.toml ] || git submodule update --init --quiet; }} && "
-    f"{_SYNC} 2>/dev/null || true"
-)
-
-_GIT_HOOK = f"""#!/usr/bin/env bash
-cd "$(git rev-parse --show-toplevel)" && [ -x {_SYNC} ] && {_SYNC} >/dev/null || true
-"""
+GUIDE = ".jobsmith/guide.md"
+# The jobsmith version this data repo was last set up with. Its pin: `init --check` compares it
+# with the installed CLI, and with the plugin's version, which ship separately.
+VERSION = ".jobsmith/version"
+UPGRADE = "uv tool upgrade jobsmith"
 
 
-def main_checkout(root: Path) -> Path:
-    """The main working tree of the repo at `root`, even when `root` is a linked worktree.
-
-    The plugin marketplace is registered once per user, so it must point at a checkout that
-    outlives any worktree.
-    """
-    common = _git(root, "rev-parse", "--path-format=absolute", "--git-common-dir").stdout.strip()
-    return Path(common).parent if common.endswith("/.git") else root
+def _guide() -> str:
+    return files("jobsmith").joinpath("data-repo-guide.md").read_text()
 
 
-def _settings(main: Path) -> str:
+def _settings() -> str:
     return json.dumps(
         {
-            "extraKnownMarketplaces": {
-                MARKETPLACE: {"source": {"source": "directory", "path": str(main / SUBMODULE_PATH)}}
-            },
+            "extraKnownMarketplaces": {MARKETPLACE: {"source": {"source": "github", "repo": JOBSMITH_REPO}}},
             "enabledPlugins": {PLUGIN: True},
-            "hooks": {
-                "SessionStart": [
-                    {
-                        "hooks": [
-                            {
-                                "type": "command",
-                                "command": _SESSION_START,
-                                "timeout": 120,
-                                "statusMessage": "Syncing jobsmith",
-                            }
-                        ]
-                    }
-                ]
-            },
         },
         indent=2,
     )
 
+
+_OLD_SYNC = "tools/jobsmith/scripts/sync.sh"
+_OLD_GIT_HOOK = f"""#!/usr/bin/env bash
+cd "$(git rev-parse --show-toplevel)" && [ -x {_OLD_SYNC} ] && {_OLD_SYNC} >/dev/null || true
+"""
 
 # Wiring from earlier jobsmith versions, removed by `init --force` if unmodified.
 _OBSOLETE: dict[str, str] = {
@@ -87,7 +66,12 @@ _OBSOLETE: dict[str, str] = {
         },
         indent=2,
     ),
+    ".githooks/post-merge": _OLD_GIT_HOOK,
+    ".githooks/post-checkout": _OLD_GIT_HOOK,
 }
+
+# The guide's import line in CLAUDE.md from when jobsmith was a submodule of the data repo.
+_OLD_GUIDE_IMPORT = "@tools/jobsmith/docs/data-repo-guide.md"
 
 _GITIGNORE = """.DS_Store
 .venv/
@@ -98,7 +82,7 @@ __pycache__/
 .browser-profiles/
 """
 
-_CLAUDE_MD = f"""@{SUBMODULE_PATH}/docs/data-repo-guide.md
+_CLAUDE_MD = f"""@{GUIDE}
 
 ## Personal notes
 
@@ -106,7 +90,7 @@ _CLAUDE_MD = f"""@{SUBMODULE_PATH}/docs/data-repo-guide.md
      written. jobsmith never overwrites this file. -->
 """
 
-_PROFILE = """# Schema: tools/jobsmith/src/jobsmith/models.py (Profile)
+_PROFILE = f"""# Schema: Profile in https://github.com/{JOBSMITH_REPO}/blob/main/src/jobsmith/models.py
 name:
 email:
 phone:
@@ -123,12 +107,12 @@ standard_answers:
 """
 
 
-def scaffold_files(main: Path) -> dict[str, str]:
+def scaffold_files() -> dict[str, str]:
     return {
-        ".claude/settings.json": _settings(main) + "\n",
+        ".claude/settings.json": _settings() + "\n",
+        GUIDE: _guide(),
+        VERSION: __version__ + "\n",
         ".gitignore": _GITIGNORE,
-        ".githooks/post-merge": _GIT_HOOK,
-        ".githooks/post-checkout": _GIT_HOOK,
     }
 
 
@@ -141,8 +125,6 @@ STARTER_FILES: dict[str, str] = {
     "applications/.gitkeep": "",
     "linkedin/posts/.gitkeep": "",
 }
-
-EXECUTABLE = {".githooks/post-merge", ".githooks/post-checkout"}
 
 
 @dataclass
@@ -160,8 +142,28 @@ def _git(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(["git", "-C", str(root), *args], capture_output=True, text=True, check=False)
 
 
-def _write(root: Path, rel: str, content: str, *, overwrite: bool, report: Report) -> None:
+def _same(rel: str, a: str, b: str) -> bool:
+    return json.loads(a) == json.loads(b) if rel.endswith(".json") else a == b
+
+
+# Files other tools write to as well. jobsmith owns only its own lines in them: it adds the ones
+# that are missing and leaves every other line alone.
+SHARED = {".gitignore"}
+
+
+def _patterns(text: str) -> list[str]:
+    return [line for line in text.splitlines() if line.strip() and not line.startswith("#")]
+
+
+def _write(root: Path, rel: str, content: str, *, overwrite: bool, dry_run: bool, report: Report) -> None:
     path = root / rel
+    if path.exists() and rel in SHARED:
+        have = path.read_text()
+        missing = [p for p in _patterns(content) if p not in _patterns(have)]
+        if not missing:
+            report.unchanged.append(rel)
+            return
+        content = have + ("" if have.endswith("\n") or not have else "\n") + "\n".join(missing) + "\n"
     if path.exists():
         if path.read_text() == content:
             report.unchanged.append(rel)
@@ -172,49 +174,89 @@ def _write(root: Path, rel: str, content: str, *, overwrite: bool, report: Repor
         report.updated.append(rel)
     else:
         report.created.append(rel)
+    if dry_run:
+        return
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content)
-    if rel in EXECUTABLE:
-        path.chmod(0o755)
 
 
-def init(root: Path, *, force: bool = False, submodule: bool = True, url: str = JOBSMITH_URL) -> Report:
+def init(root: Path, *, force: bool = False, dry_run: bool = False) -> Report:
+    """Create or refresh the data repo at `root`. With `dry_run`, report what would change."""
     root = root.expanduser().resolve()
-    root.mkdir(parents=True, exist_ok=True)
     report = Report()
 
-    if _git(root, "rev-parse", "--show-toplevel").stdout.strip() != str(root):
-        _git(root, "init", "-q")
-        report.notes.append("initialized git repo")
+    if not dry_run:
+        root.mkdir(parents=True, exist_ok=True)
+        if _git(root, "rev-parse", "--show-toplevel").stdout.strip() != str(root):
+            _git(root, "init", "-q")
+            report.notes.append("initialized git repo")
 
-    for rel, content in scaffold_files(main_checkout(root)).items():
-        _write(root, rel, content, overwrite=force, report=report)
+    for rel, content in scaffold_files().items():
+        _write(root, rel, content, overwrite=force, dry_run=dry_run, report=report)
     for rel, content in STARTER_FILES.items():
-        _write(root, rel, content, overwrite=False, report=report)
+        _write(root, rel, content, overwrite=False, dry_run=dry_run, report=report)
     for rel, old in _OBSOLETE.items():
         path = root / rel
-        if not path.exists() or json.loads(path.read_text()) != json.loads(old):
+        if not path.exists() or not _same(rel, path.read_text(), old):
             continue  # absent, or the user's own file
         if force:
-            path.unlink()
+            if not dry_run:
+                path.unlink()
             report.removed.append(rel)
         else:
             report.notes.append(f"{rel} is from an older jobsmith; `init --force` removes it")
 
-    _git(root, "config", "core.hooksPath", ".githooks")
-    _git(root, "config", "push.recurseSubmodules", "check")
-    _git(root, "config", "submodule.recurse", "true")  # pull/checkout move tools/jobsmith too
+    hooks = root / ".githooks"
+    if not dry_run and hooks.is_dir() and not any(hooks.iterdir()):
+        hooks.rmdir()
+        if _git(root, "config", "core.hooksPath").stdout.strip() == ".githooks":
+            _git(root, "config", "--unset", "core.hooksPath")
 
-    if submodule and not (root / SUBMODULE_PATH / "pyproject.toml").exists():
-        added = _git(root, "submodule", "add", "-q", url, SUBMODULE_PATH)
-        if added.returncode:
-            report.notes.append(f"could not add submodule: {added.stderr.strip()}")
-        else:
-            report.notes.append(f"added {url} at {SUBMODULE_PATH}")
-
-    sync = root / _SYNC
-    if sync.exists():
-        out = subprocess.run([str(sync)], capture_output=True, text=True, check=False).stdout.strip()
-        if out:
-            report.notes.append(json.loads(out)["systemMessage"])
+    claude_md = root / "CLAUDE.md"
+    if claude_md.exists() and _OLD_GUIDE_IMPORT in claude_md.read_text():
+        report.notes.append(f"CLAUDE.md imports the old guide: change `{_OLD_GUIDE_IMPORT}` to `@{GUIDE}`")
     return report
+
+
+def stale(root: Path) -> list[str]:
+    """What `init --force` would change in the data repo at `root`; empty when it is current."""
+    r = init(root, force=True, dry_run=True)
+    wiring = scaffold_files().keys()
+    # A missing starter file is the user's business: they may have deleted it on purpose.
+    return [*(p for p in [*r.created, *r.updated] if p in wiring), *r.removed, *r.notes]
+
+
+def _parse(version: str) -> tuple[int, ...]:
+    return tuple(int(part) for part in version.split("."))
+
+
+def plugin_version(plugin_root: Path) -> str | None:
+    try:
+        return json.loads((plugin_root / ".claude-plugin/plugin.json").read_text()).get("version")
+    except (OSError, ValueError):
+        return None
+
+
+def check(root: Path, plugin_root: Path | None = None) -> list[str]:
+    """One line for each thing out of step: the plugin and the CLI, the pin and the CLI, and
+    the wiring. Empty when the data repo at `root` is current."""
+    lines = []
+    if plugin_root is not None and (plugin := plugin_version(plugin_root)) != __version__:
+        lines.append(
+            f"the plugin is {plugin or 'unversioned'} and the CLI is {__version__}. "
+            f"Run `{UPGRADE}` and `/plugin marketplace update {MARKETPLACE}`, then restart the session."
+        )
+    pin_file = root.expanduser().resolve() / VERSION
+    pin = pin_file.read_text().strip() if pin_file.exists() else None
+    if pin and pin != __version__:
+        try:
+            behind = _parse(__version__) < _parse(pin)
+        except ValueError:
+            behind = False
+        fix = f"`{UPGRADE}`" if behind else "`jobsmith init --force .`, then commit"
+        lines.append(f"this data repo is set up for jobsmith {pin} and the CLI is {__version__}. Run {fix}.")
+    if wiring := [p for p in stale(root) if p != VERSION]:
+        lines.append(
+            f"this data repo's wiring is out of date ({', '.join(wiring)}). Run `jobsmith init --force .`"
+        )
+    return [f"jobsmith: {line}" for line in lines]

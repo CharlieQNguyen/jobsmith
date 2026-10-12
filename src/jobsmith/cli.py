@@ -11,7 +11,7 @@ from urllib.parse import urlparse
 
 import typer
 
-from jobsmith import ats, browser, credentials, resume, scaffold, store
+from jobsmith import __version__, ats, browser, credentials, resume, scaffold, store
 from jobsmith.models import Account, Application, Event, Status
 
 app = typer.Typer(no_args_is_help=True, help="Keep your job search in plain files.")
@@ -20,6 +20,23 @@ creds_cmd = typer.Typer(no_args_is_help=True, help="Site credentials in the OS k
 browser_cmd = typer.Typer(no_args_is_help=True, help="The Chrome that you log into and an agent drives.")
 resume_cmd = typer.Typer(no_args_is_help=True, help="Resumes (JSON Resume files in resumes/).")
 app.add_typer(apps_cmd, name="apps")
+
+
+def _version(value: bool) -> None:
+    if value:
+        typer.echo(__version__)
+        raise typer.Exit()
+
+
+@app.callback()
+def _main(
+    version: Annotated[
+        bool, typer.Option("--version", callback=_version, is_eager=True, help="Print the version")
+    ] = False,
+) -> None:
+    pass
+
+
 app.add_typer(creds_cmd, name="creds")
 app.add_typer(browser_cmd, name="browser")
 app.add_typer(resume_cmd, name="resume")
@@ -34,10 +51,19 @@ DataOpt = Annotated[
 def init(
     directory: Annotated[Path, typer.Argument(help="Data repo to create or refresh")] = Path("."),
     force: Annotated[bool, typer.Option(help="Overwrite jobsmith-owned wiring (never your data)")] = False,
-    submodule: Annotated[bool, typer.Option(help="Add jobsmith as a submodule at tools/jobsmith")] = True,
+    check: Annotated[
+        bool, typer.Option(help="Change nothing; print a line for each version or wiring out of step")
+    ] = False,
+    plugin: Annotated[
+        Path | None, typer.Option(help="With --check: the plugin's directory, to compare its version")
+    ] = None,
 ) -> None:
     """Create a private data repo wired up for jobsmith and Claude Code, or refresh one."""
-    r = scaffold.init(directory, force=force, submodule=submodule)
+    if check:
+        for line in scaffold.check(directory, plugin):
+            typer.echo(line)
+        return
+    r = scaffold.init(directory, force=force)
     for label, paths, color in [
         ("created", r.created, "green"),
         ("updated", r.updated, "yellow"),

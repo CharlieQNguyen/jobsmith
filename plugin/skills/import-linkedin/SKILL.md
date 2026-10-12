@@ -6,7 +6,7 @@ description: Fill profile/profile.yaml and resumes/base.json (JSON Resume) from 
 # Import from LinkedIn
 
 Run from the user's jobsmith data repo (see its CLAUDE.md). The result is `profile/profile.yaml`
-(schema: `Profile` in `tools/jobsmith/src/jobsmith/models.py`) and `resumes/base.json`
+(schema: `Profile` in jobsmith's `src/jobsmith/models.py`) and `resumes/base.json`
 ([JSON Resume v1.0.0](https://jsonresume.org/schema)).
 
 **Hard rules.**
@@ -85,4 +85,4 @@ uvx check-jsonschema --schemafile https://raw.githubusercontent.com/jsonresume/r
 ```
 
 Fix any failures. Then close the tab you opened (or `jobsmith browser stop`) and tell the user
-what was written and what's still blank. Remind them to finish with `/jobsmith:land`.
+what was written and what's still blank.
