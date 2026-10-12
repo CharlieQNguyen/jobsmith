@@ -32,10 +32,10 @@ uv run pytest -q
 
 - `git -C "$J" status --short` and `git -C "$J" diff --stat`. If nothing changed, say so and stop.
 - If the change reaches users (the CLI, the plugin, or what `jobsmith init` writes), bump the
-  version in `pyproject.toml`, `src/jobsmith/__init__.py` and `plugin/.claude-plugin/plugin.json`
-  together, then `uv lock`. A test fails when they differ. Data repos record the version they
-  were set up with, and the plugin compares its version with the CLI's at session start, so a
-  bump is what tells users to update.
+  version in `pyproject.toml`, `src/jobsmith/__init__.py` and `.claude-plugin/plugin.json`
+  together, then `uv lock`. A test fails when they differ. The plugin installs the CLI at its own
+  version when they differ, and data repos record the version they were set up with, so a bump
+  is what reaches users.
 - Read the full diff. Look for anything personal: real names, emails, phone numbers,
   companies the user applied to, resume content, paths under `/Users/<name>`. The pre-commit hook
   catches only the obvious cases. **If you find anything, stop and show it to the user.**

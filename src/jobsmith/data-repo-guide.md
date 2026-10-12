@@ -22,8 +22,9 @@ this repo. This guide ships with jobsmith: `jobsmith init --force .` writes it t
 
 ## Commands
 
-`jobsmith` is a uv tool: `uv tool install git+https://github.com/CharlieQNguyen/jobsmith`, and
-`uv tool upgrade jobsmith` to update it. Commands find the data from the current directory
+The jobsmith plugin installs the `jobsmith` command (a uv tool) from its own copy at session
+start, so the two are always the same version; update the plugin and the command follows. An
+editable install, for developing jobsmith, is left alone. Commands find the data from the current directory
 (nearest folder with `accounts.yaml`), so they act on whichever checkout or worktree you're in.
 
 - `jobsmith check` — validate all data files
@@ -46,7 +47,8 @@ this repo. This guide ships with jobsmith: `jobsmith init --force .` writes it t
 `jobsmith` plugin for this repo only. It provides the `jobsmith-browser` MCP server and the
 `/jobsmith:*` skills — `apply` (job URL → submitted application), `track` (status news,
 follow-ups) and `import-linkedin` (seed the profile and base resume from your LinkedIn). Update
-it with `/plugin marketplace update jobsmith`, at the same time as the CLI.
+it with `/plugin marketplace update jobsmith`; the `jobsmith` command follows at the next
+session start.
 
 ## Sessions and worktrees
 

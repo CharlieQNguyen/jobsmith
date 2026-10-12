@@ -8,7 +8,7 @@ tailoring resumes, tracking follow-ups, filling Workday forms, drafting LinkedIn
 
 ## How it works
 
-jobsmith is the **tool**, installed as a command and a Claude Code plugin. Your **data** lives
+jobsmith is the **tool**: a Claude Code plugin that installs the `jobsmith` command to match itself. Your **data** lives
 in a separate, private repo of plain files. Nothing personal ever goes in this repo, and
 nothing of jobsmith's is copied into yours beyond a little wiring.
 
@@ -31,20 +31,20 @@ See [`examples/`](examples/) for the file formats. Resumes use the
 You need [uv](https://docs.astral.sh/uv/), git, and Google Chrome (for browser features). Then:
 
 ```bash
-uv tool install git+https://github.com/CharlieQNguyen/jobsmith
-jobsmith init ~/Developer/my-job-search
-cd ~/Developer/my-job-search
-gh repo create my-job-search --private --source . --push   # or any private remote
+uvx --from git+https://github.com/CharlieQNguyen/jobsmith jobsmith init ~/Developer/jobsmith-hq
+cd ~/Developer/jobsmith-hq
+gh repo create jobsmith-hq --private --source . --push   # or any private remote
 ```
 
-`jobsmith init` creates your data repo and wires up Claude Code:
+`jobsmith init` creates your data repo and wires up Claude Code. Open Claude Code there and
+trust the jobsmith marketplace when it asks; the plugin then installs the `jobsmith` command.
 
 - `CLAUDE.md` imports jobsmith's [data repo guide](src/jobsmith/data-repo-guide.md), written to
   `.jobsmith/guide.md`, and leaves room for your own notes
 - the `jobsmith` Claude Code plugin from this repo's marketplace, enabled for that repo only:
   job-search skills (`/jobsmith:*`), a `jobsmith-browser` MCP server so Claude can drive the
-  browser you sign into, and a session-start check that the command is installed and the wiring
-  is current
+  browser you sign into, and a session-start hook that installs the `jobsmith` command at the
+  plugin's version and checks the wiring
 
 | Skill | What it does |
 |---|---|
@@ -52,10 +52,11 @@ gh repo create my-job-search --private --source . --push   # or any private remo
 | `/jobsmith:import-linkedin` | Reads your own LinkedIn profile (a few pages, human-paced) and fills your profile and base resume after you review it |
 | `/jobsmith:track <news>` | "Acme rejected me", "screen with Globex Tuesday", "what's due?" |
 
-Run `jobsmith init --force .` later to refresh that wiring. It never touches your data. The data
-repo records the jobsmith version it was set up with in `.jobsmith/version`, and at the start of
-each session the plugin says when that, the CLI and the plugin disagree. Update with
-`uv tool upgrade jobsmith` and `/plugin marketplace update jobsmith`.
+There is one thing to update: the plugin (`/plugin marketplace update jobsmith`, or let Claude
+Code update it). At the next session start the plugin installs the `jobsmith` command from its
+own copy, so the two are always the same version. The data repo records the version it was set
+up with in `.jobsmith/version`, and the plugin says when to run `jobsmith init --force .` to
+refresh its wiring. That never touches your data.
 
 A data repo made by an older jobsmith has jobsmith as a submodule at `tools/jobsmith`. Remove it
 (`git rm tools/jobsmith`), run `jobsmith init --force .`, and change the first line of
@@ -119,7 +120,8 @@ While the port is open, any program on your machine can drive that browser. Run
 git config core.hooksPath .githooks   # blocks commits that look like personal data
 uv run pytest                         # browser tests need Chrome; skip with -m "not browser"
 uv run ruff check
-uv tool install --editable .          # the `jobsmith` command runs this checkout
+uv tool install --editable .          # the `jobsmith` command runs this checkout; the plugin
+                                      # leaves an editable install alone
 ```
 
 Working with Claude Code in this repo gives you two skills:

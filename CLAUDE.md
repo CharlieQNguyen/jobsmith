@@ -1,8 +1,9 @@
 # jobsmith
 
 Public, MIT-licensed Python tool (uv, src layout, Python ≥3.12). Users keep their data in a
-separate private repo, which uses jobsmith as an installed command and Claude Code plugin and
-holds no copy of it.
+separate private repo, which enables jobsmith's Claude Code plugin and holds no copy of jobsmith.
+The plugin is the whole repo (`.claude-plugin/plugin.json` at the root), so it carries the source,
+and its SessionStart hook installs the `jobsmith` command from that copy when the versions differ.
 
 ## Rules
 
@@ -24,9 +25,9 @@ holds no copy of it.
 - `scaffold.py` — `jobsmith init`. It writes `src/jobsmith/data-repo-guide.md` into a data repo
   as `.jobsmith/guide.md`, and `init --check` reports when that or other wiring is stale. Change
   the guide here, not in a data repo.
-- `.claude-plugin/marketplace.json` + `plugin/` — the Claude Code plugin data repos enable
-  (user-facing skills in `plugin/skills/`, `jobsmith-browser` MCP server, a SessionStart hook in
-  `plugin/hooks/`). Developer skills stay in `.claude/skills/`. Validate with
+- `.claude-plugin/` (marketplace and plugin manifests) + `plugin/` — the Claude Code plugin data
+  repos enable. `plugin.json` points at `plugin/skills/` (user-facing skills), `plugin/.mcp.json`
+  (`jobsmith-browser`) and `plugin/hooks/` (the SessionStart hook that installs the CLI). Developer skills stay in `.claude/skills/`. Validate with
   `claude plugin validate .`
 
 ## Commands

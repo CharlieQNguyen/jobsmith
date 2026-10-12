@@ -93,7 +93,7 @@ def test_one_version_across_the_package_and_the_plugin():
 
     repo = Path(__file__).parent.parent
     pyproject = tomllib.loads((repo / "pyproject.toml").read_text())["project"]["version"]
-    assert __version__ == pyproject == scaffold.plugin_version(repo / "plugin")
+    assert __version__ == pyproject == scaffold.plugin_version(repo)
 
 
 def test_init_pins_the_version_and_check_is_quiet_when_all_agree(tmp_path):
@@ -109,53 +109,82 @@ def test_check_names_the_side_to_update(tmp_path):
 
     scaffold.init(tmp_path)
     (plugin_line,) = scaffold.check(tmp_path, _plugin(tmp_path, "999.0.0"))
-    assert "the plugin is 999.0.0" in plugin_line and "uv tool upgrade jobsmith" in plugin_line
+    assert "the plugin is 999.0.0" in plugin_line and "editable install" in plugin_line
 
     (tmp_path / ".jobsmith/version").write_text("999.0.0\n")  # set up by a newer jobsmith
     (ahead,) = scaffold.check(tmp_path)
     assert f"set up for jobsmith 999.0.0 and the CLI is {__version__}" in ahead
-    assert "uv tool upgrade jobsmith" in ahead
+    assert "/plugin marketplace update jobsmith" in ahead
 
     (tmp_path / ".jobsmith/version").write_text("0.0.1\n")  # set up by an older jobsmith
     (behind,) = scaffold.check(tmp_path)
     assert "jobsmith init --force ." in behind
 
 
-def test_session_start_hook_reports_drift_as_one_system_message(tmp_path):
+def _hook_env(tmp_path, *, editable=False):
+    """A jobsmith shim on PATH, a fake uv that records installs, and a throwaway HOME, so the
+    hook can never touch the real install."""
     import os
     import sys
-    from pathlib import Path
 
-    repo = Path(__file__).parent.parent
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     shim = bin_dir / "jobsmith"
     shim.write_text(f'#!/bin/sh\nexec "{sys.executable}" -c "from jobsmith import main; main()" "$@"\n')
     shim.chmod(0o755)
+    tools = tmp_path / "tools"
+    (tools / "jobsmith").mkdir(parents=True)
+    receipt = 'requirements = [{ name = "jobsmith", editable = "/src/jobsmith" }]' if editable else ""
+    (tools / "jobsmith/uv-receipt.toml").write_text(receipt + "\n")
+    log = tmp_path / "uv.log"
+    uv = bin_dir / "uv"
+    uv.write_text(
+        f'#!/bin/sh\nif [ "$1 $2" = "tool dir" ]; then echo "{tools}"; else echo "$@" >> "{log}"; fi\n'
+    )
+    uv.chmod(0o755)
     data = tmp_path / "data"
     scaffold.init(data)
-    env = {**os.environ, "PATH": f"{bin_dir}:/usr/bin:/bin", "CLAUDE_PROJECT_DIR": str(data)}
-    hook = str(repo / "plugin/hooks/session-start.sh")
+    env = {"PATH": f"{bin_dir}:/usr/bin:/bin", "HOME": str(tmp_path), "CLAUDE_PROJECT_DIR": str(data)}
+    return {**os.environ, **env}, data, log
 
-    quiet = subprocess.run(
-        [hook],
-        env={**env, "CLAUDE_PLUGIN_ROOT": str(repo / "plugin")},
-        capture_output=True,
-        text=True,
-        check=True,
+
+def _run_hook(env, plugin_root):
+    from pathlib import Path
+
+    hook = Path(__file__).parent.parent / "plugin/hooks/session-start.sh"
+    out = subprocess.run(
+        [str(hook)], env={**env, "CLAUDE_PLUGIN_ROOT": str(plugin_root)}, capture_output=True, text=True
     )
-    assert quiet.stdout == ""
+    assert out.returncode == 0
+    return json.loads(out.stdout)["systemMessage"] if out.stdout else None
 
+
+def test_session_start_hook_is_quiet_when_all_agree(tmp_path):
+    from pathlib import Path
+
+    env, _, log = _hook_env(tmp_path)
+    assert _run_hook(env, Path(__file__).parent.parent) is None
+    assert not log.exists()
+
+
+def test_session_start_hook_installs_the_cli_from_the_plugin(tmp_path):
+    from jobsmith import __version__
+
+    env, _, log = _hook_env(tmp_path)
+    plugin = _plugin(tmp_path, "999.0.0")
+    message = _run_hook(env, plugin)
+    assert log.read_text().split() == ["tool", "install", "--reinstall", "--quiet", str(plugin)]
+    assert f"installed the jobsmith command 999.0.0 to match the plugin (was {__version__})" in message
+
+
+def test_session_start_hook_leaves_an_editable_install_and_says_so(tmp_path):
+    env, data, log = _hook_env(tmp_path, editable=True)
     (data / ".jobsmith/version").write_text("0.0.1\n")
-    drift = subprocess.run(
-        [hook],
-        env={**env, "CLAUDE_PLUGIN_ROOT": str(_plugin(tmp_path, "999.0.0"))},
-        capture_output=True,
-        text=True,
-        check=True,
-    )
-    message = json.loads(drift.stdout)["systemMessage"]
-    assert message.count("jobsmith:") == 2 and "\n" in message
+    message = _run_hook(env, _plugin(tmp_path, "999.0.0"))
+    assert not log.exists()
+    lines = message.split("\n")
+    assert len(lines) == 2 and all(line.startswith("jobsmith: ") for line in lines)
+    assert "editable install" in lines[0] and "set up for jobsmith 0.0.1" in lines[1]
 
 
 def test_gitignore_keeps_other_tools_lines(tmp_path):
@@ -170,4 +199,39 @@ def test_gitignore_keeps_other_tools_lines(tmp_path):
     lines = gitignore.read_text().splitlines()
     assert lines[:2] == ["/.sessions/", ".DS_Store"]
     assert ".claude/worktrees/" in lines and lines.count(".DS_Store") == 1
+    assert scaffold.stale(tmp_path) == []
+
+
+def test_settings_keep_other_keys_and_lose_the_old_sync_hook(tmp_path):
+    scaffold.init(tmp_path)
+    path = tmp_path / ".claude/settings.json"
+    old_sync = {"type": "command", "command": "cd x && tools/jobsmith/scripts/sync.sh || true"}
+    mine = {"type": "command", "command": "echo mine"}
+    path.write_text(
+        json.dumps(
+            {
+                "permissions": {"allow": ["Bash(ls:*)"]},
+                "extraKnownMarketplaces": {
+                    "jobsmith": {"source": {"source": "directory", "path": "/old/tools/jobsmith"}},
+                    "other": {"source": {"source": "github", "repo": "o/other"}},
+                },
+                "enabledPlugins": {"jobsmith@jobsmith": True, "other@other": True},
+                "hooks": {"SessionStart": [{"hooks": [old_sync]}, {"hooks": [mine]}]},
+            }
+        )
+    )
+    assert scaffold.stale(tmp_path) == [".claude/settings.json"]
+    scaffold.init(tmp_path, force=True)
+    settings = json.loads(path.read_text())
+    assert settings["permissions"] == {"allow": ["Bash(ls:*)"]}
+    assert settings["extraKnownMarketplaces"]["jobsmith"]["source"] == {
+        "source": "github",
+        "repo": "CharlieQNguyen/jobsmith",
+    }
+    assert settings["extraKnownMarketplaces"]["other"] and settings["enabledPlugins"]["other@other"]
+    assert settings["hooks"] == {"SessionStart": [{"hooks": [mine]}]}
+    assert scaffold.stale(tmp_path) == []
+
+    # Another tool's keys alone never make the wiring stale.
+    path.write_text(json.dumps({**settings, "env": {"X": "1"}}))
     assert scaffold.stale(tmp_path) == []

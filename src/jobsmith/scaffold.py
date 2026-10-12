@@ -29,19 +29,24 @@ MARKETPLACE = "jobsmith"
 PLUGIN = f"jobsmith@{MARKETPLACE}"
 GUIDE = ".jobsmith/guide.md"
 # The jobsmith version this data repo was last set up with. Its pin: `init --check` compares it
-# with the installed CLI, and with the plugin's version, which ship separately.
+# with the installed CLI.
 VERSION = ".jobsmith/version"
-UPGRADE = "uv tool upgrade jobsmith"
+# The plugin is the one install channel: its SessionStart hook installs the CLI from the plugin's
+# own copy, so updating the plugin updates both.
+UPDATE = f"/plugin marketplace update {MARKETPLACE}"
 
 
 def _guide() -> str:
     return files("jobsmith").joinpath("data-repo-guide.md").read_text()
 
 
+_MARKETPLACE_ENTRY = {"source": {"source": "github", "repo": JOBSMITH_REPO}}
+
+
 def _settings() -> str:
     return json.dumps(
         {
-            "extraKnownMarketplaces": {MARKETPLACE: {"source": {"source": "github", "repo": JOBSMITH_REPO}}},
+            "extraKnownMarketplaces": {MARKETPLACE: _MARKETPLACE_ENTRY},
             "enabledPlugins": {PLUGIN: True},
         },
         indent=2,
@@ -146,24 +151,53 @@ def _same(rel: str, a: str, b: str) -> bool:
     return json.loads(a) == json.loads(b) if rel.endswith(".json") else a == b
 
 
-# Files other tools write to as well. jobsmith owns only its own lines in them: it adds the ones
-# that are missing and leaves every other line alone.
-SHARED = {".gitignore"}
-
-
 def _patterns(text: str) -> list[str]:
     return [line for line in text.splitlines() if line.strip() and not line.startswith("#")]
+
+
+def _merge_gitignore(have: str, ours: str) -> str:
+    missing = [p for p in _patterns(ours) if p not in _patterns(have)]
+    if not missing:
+        return have
+    return have + ("" if have.endswith("\n") or not have else "\n") + "\n".join(missing) + "\n"
+
+
+def _is_old_sync(hook: dict) -> bool:
+    return _OLD_SYNC in str(hook.get("command", ""))
+
+
+def _merge_settings(have: str, ours: str) -> str:
+    try:
+        settings = json.loads(have)
+    except ValueError:
+        return ours  # not JSON: nothing else can be relying on it
+    if not isinstance(settings, dict):
+        return ours
+    merged = json.loads(json.dumps(settings))
+    merged.setdefault("extraKnownMarketplaces", {})[MARKETPLACE] = _MARKETPLACE_ENTRY
+    merged.setdefault("enabledPlugins", {})[PLUGIN] = True
+    # The SessionStart hook from when jobsmith was a submodule. The plugin has its own now.
+    groups = merged.get("hooks", {}).get("SessionStart", [])
+    for group in groups:
+        group["hooks"] = [h for h in group.get("hooks", []) if not _is_old_sync(h)]
+    if groups:
+        merged["hooks"]["SessionStart"] = [g for g in groups if g["hooks"]]
+        if not merged["hooks"]["SessionStart"]:
+            del merged["hooks"]["SessionStart"]
+        if not merged["hooks"]:
+            del merged["hooks"]
+    return have if merged == settings else json.dumps(merged, indent=2) + "\n"
+
+
+# Files other tools write to as well. jobsmith owns only its own part of each, the lines or the
+# keys it needs, and leaves everything else in them alone.
+SHARED = {".gitignore": _merge_gitignore, ".claude/settings.json": _merge_settings}
 
 
 def _write(root: Path, rel: str, content: str, *, overwrite: bool, dry_run: bool, report: Report) -> None:
     path = root / rel
     if path.exists() and rel in SHARED:
-        have = path.read_text()
-        missing = [p for p in _patterns(content) if p not in _patterns(have)]
-        if not missing:
-            report.unchanged.append(rel)
-            return
-        content = have + ("" if have.endswith("\n") or not have else "\n") + "\n".join(missing) + "\n"
+        content = SHARED[rel](path.read_text(), content)
     if path.exists():
         if path.read_text() == content:
             report.unchanged.append(rel)
@@ -242,9 +276,11 @@ def check(root: Path, plugin_root: Path | None = None) -> list[str]:
     the wiring. Empty when the data repo at `root` is current."""
     lines = []
     if plugin_root is not None and (plugin := plugin_version(plugin_root)) != __version__:
+        # The plugin installs the CLI to match itself, except over an editable install.
         lines.append(
-            f"the plugin is {plugin or 'unversioned'} and the CLI is {__version__}. "
-            f"Run `{UPGRADE}` and `/plugin marketplace update {MARKETPLACE}`, then restart the session."
+            f"the plugin is {plugin or 'unversioned'} and the CLI is {__version__}. The plugin installs "
+            "its version at the next session start, unless the CLI is an editable install; then update "
+            "one to match the other."
         )
     pin_file = root.expanduser().resolve() / VERSION
     pin = pin_file.read_text().strip() if pin_file.exists() else None
@@ -253,7 +289,7 @@ def check(root: Path, plugin_root: Path | None = None) -> list[str]:
             behind = _parse(__version__) < _parse(pin)
         except ValueError:
             behind = False
-        fix = f"`{UPGRADE}`" if behind else "`jobsmith init --force .`, then commit"
+        fix = f"`{UPDATE}` and restart the session" if behind else "`jobsmith init --force .`, then commit"
         lines.append(f"this data repo is set up for jobsmith {pin} and the CLI is {__version__}. Run {fix}.")
     if wiring := [p for p in stale(root) if p != VERSION]:
         lines.append(
