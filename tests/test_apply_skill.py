@@ -77,3 +77,19 @@ def test_workday_applications_start_manually_and_still_upload_the_resume():
     fill = section("5. Fill it in")
     assert "**Upload the resume PDF**" in fill
     assert "After autofill" not in SKILL
+
+
+def test_the_skill_teaches_every_workday_widget_helper():
+    from jobsmith.ats import workday
+
+    widgets = SKILL.split("### Workday's widgets", 1)[1].split("\n## ", 1)[0]
+    for helper in (workday.fill_date, workday.select_one, workday.search_prompt, workday.check_box):
+        assert f"`{helper.__name__}`" in widgets
+    for shape in (
+        "dateSectionMonth-input",
+        "Select One Required",
+        "not checked",
+        "press delete to clear value",
+    ):
+        assert shape in widgets
+    assert "check(force=True)" in widgets

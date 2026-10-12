@@ -15,7 +15,8 @@ Contract every `login.html` follows so `tests/test_ats.py` can drive it:
 drives the way the apply skill teaches, with `workday/resume.json` (fictional JSON Resume) as the
 data. Same rules: reproduce the structure and behaviour the guidance relies on, invent the text,
 copy nothing. On Submit it renders `<output id="jobsmith-result">` with JSON of every committed
-value: `{"mode": "manual" | "autofill", "values": {"<Page>/<Field>": …}}`.
+value: `{"mode": "manual" | "autofill", "values": {"<Page>/<Field>": …}}`. Open
+`apply.html#page=<Page title>` to start on one page when testing a single widget.
 
 When the fixture reproduces a quirk, make the wrong technique fail in it too, and test both; a
 quirk that the naive approach gets through untouched proves nothing.

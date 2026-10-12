@@ -137,7 +137,7 @@ Questions → Voluntary Disclosures → Self Identify → Review.
 - **Question not covered by the profile:** ask the user. Offer to save the answer to
   `standard_answers` under a short snake_case key so next time it's automatic.
 - **Voluntary / EEO / self-identification:** use the profile's answers if present; otherwise ask.
-  Never guess. "I don't wish to answer" is always acceptable.
+  Never guess. Declining ("I don't wish to answer") is acceptable wherever the form offers it.
 - **Characters the site rejects.** Workday text fields refuse `< > [ ] " { } \` ("Error:
   Contains illegal characters"). Before typing free text there (job titles, role descriptions,
   answers), run it through jobsmith's sanitizer, which uses jobsmith's own Python:
@@ -154,6 +154,33 @@ Questions → Voluntary Disclosures → Self Identify → Review.
 - Workday's submit and next buttons sometimes sit under a transparent `click_filter` overlay.
   If a click does nothing, click the overlay element or press Enter.
 - Validation errors: read them, fix them, and mention anything you had to guess.
+
+### Workday's widgets
+
+Plain clicks and fills fail on several Workday widgets, often silently. Do it this way, and
+re-read the snapshot after each one to check the value landed. With the fallback script from
+step 0, the helpers in `jobsmith.ats.workday` (`fill_date`, `select_one`, `search_prompt`,
+`check_box`) do exactly this, taking the `page` or a group (`page.get_by_role("group",
+name="Work Experience 1", exact=True)`). With the MCP tools, use `browser_run_code` for the
+Playwright steps if the server has it; otherwise as described per widget.
+
+| Widget | How to recognise it | What works |
+|---|---|---|
+| Date | A group named "From", "To", "Date"…, with spinbuttons `dateSectionMonth-input` / `dateSectionDay-input` / `dateSectionYear-input` | Not `click()` (it times out: "outside of the viewport") nor `fill()` (it doesn't stick). `focus()` the first section, type the digits as MMYYYY, MMDDYYYY or YYYY (each section moves on by itself), then Tab. MCP: `browser_evaluate` on the first spinbutton's ref with `(el) => el.focus()`, then `browser_press_key` per digit, then `Tab`. |
+| Select One | A button named "<Label> Select One Required" that opens a listbox | Not `select_option` (it isn't a `<select>`). Click the button, then the option by its exact name. Afterwards the button reads "<Label> <Value> Required". |
+| Application question | A group named by the question text, holding a button named just "Select One Required" | Every question's button has that same name: find the question's group first, then its button, then the option. |
+| Search prompt | A textbox (Field of Study, Country Phone Code, …) with a "Search" placeholder | Type a short search term and press Enter; nothing is listed until Enter, and typed text alone selects nothing. Click the option named "<Value> not checked". The selection then shows as "<Value>, press delete to clear value." |
+| Repeating group | Sections Work Experience, Education, Websites with an "Add" button, then "Add Another" | Each click adds a group named "Work Experience 1", "Education 1", "Websites 1"… Fill each through its group: Job Title, Company, Location, "I currently work here" (hides "To"), dates "From"/"To", Role Description; School or University, Degree, Field of Study; URL. |
+| Checkbox grid | Several checkboxes in one question group (employment type, disability status) | A panel over each box takes the pointer, so `check()` times out. Use `check(force=True)`. MCP: `browser_evaluate` on the box's ref with `(el) => el.click()`. |
+
+- **Degree** names differ from JSON Resume's `studyType`: "B.A." is "Bachelor of Arts (B.A)",
+  "B.S." is "Bachelor of Science (B.S)". Pick the matching option.
+- **Field of Study** is a fixed list. Search a key word of `education[].area` ("Computer"), pick
+  the closest option, and tell the user which you chose.
+- **Gender:** the decline option may be called "Not declared".
+- **Veteran status** may have no decline option. Use the profile's answer, or ask.
+- **Self Identify (disability form):** it needs the user's name (`basics.name`) and today's date
+  as well as the answer.
 
 ## 6. Review, then submit only on a yes
 

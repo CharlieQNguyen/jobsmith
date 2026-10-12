@@ -4,18 +4,35 @@
 <style>
   body { font: 14px sans-serif; margin: 16px; }
   .field { margin: 8px 0; }
-  label[data-required]::after { content: " *"; color: #b00; }
   [data-automation-id="errorMessage"] { color: #b00; margin: 2px 0; }
   .footer { position: relative; display: inline-block; margin-top: 16px; }
   [data-automation-id="click_filter"] { position: absolute; inset: 0; }
+  .date { position: relative; display: inline-flex; gap: 4px; border: 1px solid #888; padding: 2px 6px; }
+  /* The real inputs sit off to the side; only the display text shows. */
+  .date input { position: absolute; left: -9999px; width: 20px; }
+  .box { position: relative; display: inline-block; }
+  [data-automation-id="checkboxPanel"] { position: absolute; inset: 0; }
+  [role="listbox"] { border: 1px solid #888; padding: 4px; }
 </style>
 <div id="app">Loading…</div>
 <script>
-// A fake Workday application: the structure jobsmith's guidance relies on (data-automation-id
-// attributes, the start dialog, page-by-page validation, the click_filter overlay over Next and
-// Submit, a file input for the resume), and nothing copied from Workday itself.
-// On Submit the page is replaced by <output id="jobsmith-result"> holding JSON of every value
-// the application committed: {"mode": "manual" | "autofill", "values": {"<Page>/<Field>": …}}.
+// A fake Workday application: the structure and widget behaviour jobsmith's guidance relies on,
+// and nothing copied from Workday itself. Pages: My Information → My Experience → Application
+// Questions → Voluntary Disclosures → Self Identify → Review.
+//
+// Widgets, and what they do to the techniques that look right but aren't:
+// - Text fields reject < > [ ] " { } \ ("Error: Contains illegal characters").
+// - Dates: role=spinbutton inputs (dateSectionMonth-input / -Day- / -Year-) placed outside the
+//   page, so click() can never reach them; they keep their own digits, so fill() doesn't stick.
+//   focus() the first section, type the digits (it moves on by itself), then Tab out to commit.
+// - "Select One" buttons open a listbox at the end of the page; they are not <select>s.
+//   Application-question buttons are all named "Select One Required"; their group names them.
+// - Search prompts list options only after Enter. Options are named "<Value> not checked"; the
+//   selection shows as "<Value>, press delete to clear value.". Typed text alone selects nothing.
+// - Checkbox grids: a panel over each box takes the pointer, so check() needs force=True.
+// - Next and Submit sit under a transparent click_filter overlay.
+// On Submit the page becomes <output id="jobsmith-result"> holding JSON of every committed value:
+// {"mode": "manual" | "autofill", "values": {"<Page>/<Field>": …}}.
 const ILLEGAL = /[<>\[\]"{}\\]/;
 const state = { mode: null, page: 0, values: {} };
 const h = (tag, attrs = {}, ...kids) => {
@@ -31,80 +48,278 @@ let uid = 0;
 const nextId = () => `f${++uid}`;
 
 // --- fields -------------------------------------------------------------------------------
-// Each field returns an element and registers a check(): an error string or null, and a
-// commit() that stores its value under its path.
+// Each field registers check() (an error string or null) and commit() (stores its value).
+// A field whose wrapper is hidden is skipped.
 let fields = [];
+const register = (wrapper, check, commit) => fields.push({ wrapper, check, commit });
 
 function showError(wrapper, msg) {
-  wrapper.querySelector('[data-automation-id="errorMessage"]')?.remove();
-  const input = wrapper.querySelector("input, textarea");
+  wrapper.querySelector(':scope > [data-automation-id="errorMessage"]')?.remove();
+  const input = wrapper.querySelector("input, textarea, button");
   if (!msg) { input?.removeAttribute("aria-invalid"); return; }
   const id = nextId();
   wrapper.append(h("p", { "data-automation-id": "errorMessage", id }, msg));
   input?.setAttribute("aria-invalid", "true");
   input?.setAttribute("aria-describedby", id);
 }
+const required = (label) => `Error: The field ${label} is required and must have a value.`;
 
-function textField(path, label, { required = true, multiline = false } = {}) {
+function textField(path, label, { optional = false, multiline = false } = {}) {
   const id = nextId();
-  const input = h(multiline ? "textarea" : "input", { id, type: multiline ? null : "text", "aria-required": required ? "true" : null });
+  const input = h(multiline ? "textarea" : "input", { id, type: multiline ? null : "text", "aria-required": optional ? null : "true" });
   const wrapper = h("div", { class: "field", "data-automation-id": `formField-${label}` },
-    h("label", { for: id, "data-required": required }, label), input);
+    h("label", { for: id, "data-required": !optional }, label), input);
   const check = () => {
     const v = input.value.trim();
-    if (required && !v) return `Error: The field ${label} is required and must have a value.`;
+    if (!optional && !v) return required(label);
     if (ILLEGAL.test(v)) return "Error: Contains illegal characters";
     return null;
   };
   input.addEventListener("blur", () => showError(wrapper, check()));
-  fields.push({ wrapper, check, commit: () => { if (input.value.trim()) state.values[path] = input.value.trim(); } });
+  register(wrapper, check, () => { if (input.value.trim()) state.values[path] = input.value.trim(); });
+  return wrapper;
+}
+
+function dateField(path, label, sections, { optional = false } = {}) {
+  // sections: "MY" (month/year), "Y" (year) or "MDY".
+  const SPEC = { M: ["Month", 2, "MM", 12], D: ["Day", 2, "DD", 31], Y: ["Year", 4, "YYYY", 9999] };
+  const gid = nextId();
+  const group = h("div", { role: "group", "aria-labelledby": gid, class: "date", "data-automation-id": "dateInputWrapper" });
+  const parts = [...sections].map((s) => {
+    const [name, len, placeholder, max] = SPEC[s];
+    const input = h("input", {
+      type: "text", role: "spinbutton", "aria-label": name, "aria-valuemin": 1, "aria-valuemax": max,
+      "data-automation-id": `dateSection${name}-input`,
+    });
+    const display = h("div", { "data-automation-id": `dateSection${name}-display`, "aria-hidden": "true" }, placeholder);
+    group.append(display, input);
+    return { input, display, len, max, placeholder, buf: "" };
+  });
+  let committed = "", partial = false;
+  const show = (p) => { p.input.value = p.buf; p.display.textContent = p.buf || p.placeholder; p.input.setAttribute("aria-valuenow", p.buf); };
+  parts.forEach((p, i) => {
+    p.input.addEventListener("keydown", (e) => {
+      if (/^\d$/.test(e.key)) {
+        e.preventDefault();
+        if (p.buf.length < p.len) p.buf += e.key;
+        show(p);
+        if (p.buf.length === p.len && parts[i + 1]) parts[i + 1].input.focus();
+      } else if (e.key === "Backspace") {
+        e.preventDefault();
+        p.buf = p.buf.slice(0, -1);
+        show(p);
+      }
+    });
+    // The widget owns its digits: a value set from outside (fill) is put back.
+    p.input.addEventListener("input", () => show(p));
+  });
+  const wrapper = h("div", { class: "field" }, h("span", { id: gid, "data-required": !optional }, label), " ", group);
+  const check = () => {
+    if (partial) return "Error: Enter a valid date.";
+    if (!optional && !committed) return required(label);
+    return null;
+  };
+  group.addEventListener("focusout", (e) => {
+    if (group.contains(e.relatedTarget)) return;
+    const full = parts.every((p) => p.buf.length === p.len && +p.buf >= 1 && +p.buf <= p.max);
+    partial = !full && parts.some((p) => p.buf);
+    committed = full ? parts.map((p) => p.buf).join("/") : "";
+    showError(wrapper, check());
+  });
+  register(wrapper, check, () => { if (committed) state.values[path] = committed; });
+  return wrapper;
+}
+
+function closePopups() { document.querySelectorAll("[data-popup]").forEach((el) => el.remove()); }
+
+function selectOne(path, label, options, { optional = false, question = false } = {}) {
+  let value = "";
+  const name = () => [question ? "" : label, value || "Select One", optional ? "" : "Required"].filter(Boolean).join(" ");
+  const button = h("button", { type: "button", "aria-haspopup": "listbox", "data-automation-id": "selectWidget" }, "Select One");
+  const refresh = () => { button.textContent = value || "Select One"; button.setAttribute("aria-label", name()); };
+  refresh();
+  button.addEventListener("click", () => {
+    closePopups();
+    document.body.append(h("ul", { role: "listbox", "data-popup": true },
+      options.map((o) => h("li", { role: "option", "aria-selected": String(o === value), onclick: () => {
+        value = o; refresh(); closePopups(); showError(wrapper, null);
+      } }, o))));
+  });
+  const lid = nextId();
+  const wrapper = question
+    ? h("div", { role: "group", "aria-labelledby": lid, class: "field" }, h("p", { id: lid, "data-required": !optional }, label), button)
+    : h("div", { class: "field" }, h("label", { id: lid, "data-required": !optional }, label), " ", button);
+  register(wrapper, () => (!optional && !value ? required(label) : null), () => { if (value) state.values[path] = value; });
+  return wrapper;
+}
+
+function searchPrompt(path, label, options, { optional = false } = {}) {
+  let value = "";
+  const id = nextId();
+  const input = h("input", { id, type: "text", "data-automation-id": "searchBox", placeholder: "Search" });
+  const pills = h("div", {});
+  const select = (o) => {
+    value = o;
+    pills.replaceChildren(o ? h("div", {
+      role: "button", tabindex: 0, "data-automation-id": "selectedItem", "aria-label": `${o}, press delete to clear value.`,
+      onkeydown: (e) => { if (e.key === "Delete" || e.key === "Backspace") select(""); },
+    }, o) : "");
+    input.value = "";
+    closePopups();
+  };
+  input.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    closePopups();
+    const q = input.value.trim().toLowerCase();
+    const hits = options.filter((o) => o.toLowerCase().includes(q));
+    document.body.append(h("div", { role: "listbox", "data-popup": true },
+      hits.length ? hits.map((o) => h("div", {
+        role: "option", "aria-label": `${o} ${o === value ? "checked" : "not checked"}`, "aria-selected": String(o === value),
+        "data-automation-id": "promptOption", onclick: () => select(o),
+      }, o)) : h("p", {}, "No Items.")));
+  });
+  const wrapper = h("div", { class: "field", "data-automation-id": `formField-${label}` },
+    h("label", { for: id, "data-required": !optional }, label), pills, input);
+  register(wrapper, () => (!optional && !value ? required(label) : null), () => { if (value) state.values[path] = value; });
+  return wrapper;
+}
+
+function checkbox(path, label, { requiredTrue = false, onchange = null } = {}) {
+  const id = nextId();
+  const input = h("input", { type: "checkbox", id, onchange });
+  const wrapper = h("div", { class: "field" }, input, h("label", { for: id, "data-required": requiredTrue }, label));
+  register(wrapper, () => (requiredTrue && !input.checked ? required(label) : null),
+    () => { if (input.checked) state.values[path] = true; });
+  return wrapper;
+}
+
+function checkboxGrid(path, question, options, { optional = false } = {}) {
+  const qid = nextId();
+  const boxes = options.map((o) => {
+    const id = nextId();
+    const input = h("input", { type: "checkbox", id });
+    // The styled panel over the box takes the pointer and toggles the box itself.
+    const panel = h("span", { "data-automation-id": "checkboxPanel", onclick: () => input.click() });
+    return { o, input, el: h("div", {}, h("span", { class: "box" }, input, panel), h("label", { for: id }, o)) };
+  });
+  const wrapper = h("div", { role: "group", "aria-labelledby": qid, class: "field" },
+    h("p", { id: qid, "data-required": !optional }, question), boxes.map((b) => b.el));
+  const chosen = () => boxes.filter((b) => b.input.checked).map((b) => b.o);
+  register(wrapper, () => (!optional && !chosen().length ? required(question) : null),
+    () => { if (chosen().length) state.values[path] = chosen(); });
   return wrapper;
 }
 
 function resumeUpload(path) {
-  const id = nextId();
-  const input = h("input", { id, type: "file", accept: ".pdf", "data-automation-id": "file-upload-input-ref", "aria-label": "Resume/CV" });
+  const input = h("input", { type: "file", accept: ".pdf", "data-automation-id": "file-upload-input-ref", "aria-label": "Resume/CV" });
   const done = h("div", { "data-automation-id": "file-upload-successful" });
   input.addEventListener("change", () => { done.textContent = input.files[0]?.name ?? ""; });
-  const wrapper = h("div", { role: "group", "aria-label": "Resume/CV", class: "field" },
-    h("h3", {}, "Resume/CV"), input, done);
-  fields.push({
-    wrapper,
-    check: () => (done.textContent ? null : "Error: Upload a resume."),
-    commit: () => { state.values[path] = done.textContent; },
-  });
+  const wrapper = h("div", { role: "group", "aria-label": "Resume/CV", class: "field" }, h("h3", {}, "Resume/CV"), input, done);
+  register(wrapper, () => (done.textContent ? null : "Error: Upload a resume."), () => { state.values[path] = done.textContent; });
   return wrapper;
 }
 
+function repeating(page, title, build) {
+  // "Add" adds "<title> 1"; then the button reads "Add Another".
+  let n = 0;
+  const items = h("div", {});
+  const add = h("button", { type: "button" }, "Add");
+  add.addEventListener("click", () => {
+    n++;
+    const hid = nextId();
+    const name = `${title} ${n}`;
+    items.append(h("div", { role: "group", "aria-labelledby": hid }, h("h4", { id: hid }, name), build(`${page}/${name}`)));
+    add.textContent = "Add Another";
+  });
+  return h("section", { role: "group", "aria-label": title }, h("h3", {}, title), items, add);
+}
+
 // --- pages --------------------------------------------------------------------------------
+const YES_NO = ["Yes", "No"];
 const PAGES = [
   ["My Information", (p) => [
+    selectOne(`${p}/Country`, "Country", ["Canada", "United Kingdom", "United States of America"]),
     textField(`${p}/First Name`, "First Name"),
     textField(`${p}/Last Name`, "Last Name"),
     textField(`${p}/Address Line 1`, "Address Line 1"),
-    textField(`${p}/Address Line 2`, "Address Line 2", { required: false }),
+    textField(`${p}/Address Line 2`, "Address Line 2", { optional: true }),
     textField(`${p}/City`, "City"),
+    selectOne(`${p}/State`, "State", ["California", "New York", "Oregon", "Texas", "Washington"]),
     textField(`${p}/Postal Code`, "Postal Code"),
     textField(`${p}/Email Address`, "Email Address"),
+    selectOne(`${p}/Phone Device Type`, "Phone Device Type", ["Home", "Mobile", "Work"]),
+    searchPrompt(`${p}/Country Phone Code`, "Country Phone Code",
+      ["Canada (+1)", "India (+91)", "United Kingdom (+44)", "United States of America (+1)"]),
     textField(`${p}/Phone Number`, "Phone Number"),
   ]],
   ["My Experience", (p) => [
+    repeating(p, "Work Experience", (g) => {
+      const to = dateField(`${g}/To`, "To", "MY");
+      return [
+        textField(`${g}/Job Title`, "Job Title"),
+        textField(`${g}/Company`, "Company"),
+        textField(`${g}/Location`, "Location", { optional: true }),
+        checkbox(`${g}/I currently work here`, "I currently work here",
+          { onchange: (e) => { to.hidden = e.target.checked; } }),
+        dateField(`${g}/From`, "From", "MY"),
+        to,
+        textField(`${g}/Role Description`, "Role Description", { optional: true, multiline: true }),
+      ];
+    }),
+    repeating(p, "Education", (g) => [
+      textField(`${g}/School or University`, "School or University"),
+      selectOne(`${g}/Degree`, "Degree", ["High School Diploma", "Associate's Degree", "Bachelor of Arts (B.A)",
+        "Bachelor of Science (B.S)", "Master of Science (M.S)", "Master of Business Administration (M.B.A)"]),
+      searchPrompt(`${g}/Field of Study`, "Field of Study", ["Accounting", "Business Administration",
+        "Computer and Information Sciences", "Computer Engineering", "Economics", "Mathematics"], { optional: true }),
+      dateField(`${g}/From`, "From", "Y", { optional: true }),
+      dateField(`${g}/To (Actual or Expected)`, "To (Actual or Expected)", "Y", { optional: true }),
+    ]),
     resumeUpload(`${p}/Resume/CV`),
+    repeating(p, "Websites", (g) => [textField(`${g}/URL`, "URL")]),
+  ]],
+  ["Application Questions", (p) => {
+    const q = (text, options) => selectOne(`${p}/${text}`, text, options, { question: true });
+    return [
+      q("Are you legally authorized to work in the country where this job is located?", YES_NO),
+      q("Will you now or in the future require sponsorship for an employment visa?", YES_NO),
+      q("How did you hear about this position?", ["Company Website", "Employee Referral", "Job Board", "Other Job Board", "Other"]),
+      checkboxGrid(`${p}/Which types of employment are you open to?`, "Which types of employment are you open to?",
+        ["Full-time", "Part-time", "Contract"]),
+    ];
+  }],
+  ["Voluntary Disclosures", (p) => [
+    selectOne(`${p}/Gender`, "Gender", ["Female", "Male", "Not declared"]),
+    selectOne(`${p}/Ethnicity`, "Ethnicity", ["Asian", "Black or African American", "Hispanic or Latino",
+      "Two or More Races", "White", "I do not wish to answer"]),
+    // No way to decline here: the answer has to come from the user.
+    selectOne(`${p}/Veteran Status`, "Veteran Status",
+      ["I am not a protected veteran", "I identify as one or more of the classifications of protected veteran"]),
+    checkbox(`${p}/I have read and consent to the terms and conditions`,
+      "I have read and consent to the terms and conditions", { requiredTrue: true }),
+  ]],
+  ["Self Identify", (p) => [
+    textField(`${p}/Name`, "Name"),
+    dateField(`${p}/Date`, "Date", "MDY"),
+    checkboxGrid(`${p}/Disability status`, "Disability status", [
+      "Yes, I have a disability or have had one in the past",
+      "No, I do not have a disability and have not had one in the past",
+      "I do not want to answer",
+    ]),
   ]],
   ["Review", () => []],
 ];
 
 function footerButton(label, onActivate) {
-  // The button sits under a transparent overlay that takes the pointer; the overlay's click
-  // (or Enter on the focused button) is what moves the application on.
   const button = h("button", { type: "button", "data-automation-id": "bottom-navigation-next-button" }, label);
   button.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); onActivate(); } });
-  return h("div", { class: "footer" }, button,
-    h("div", { "data-automation-id": "click_filter", onclick: onActivate }));
+  return h("div", { class: "footer" }, button, h("div", { "data-automation-id": "click_filter", onclick: onActivate }));
 }
 
 function renderPage() {
   fields = [];
+  closePopups();
   const [title, build] = PAGES[state.page];
   const last = state.page === PAGES.length - 1;
   app.replaceChildren(
@@ -116,8 +331,9 @@ function renderPage() {
 }
 
 function next() {
+  const live = fields.filter((f) => f.wrapper.isConnected && !f.wrapper.closest("[hidden]"));
   let errors = 0;
-  for (const f of fields) {
+  for (const f of live) {
     const msg = f.check();
     showError(f.wrapper, msg);
     if (msg) errors++;
@@ -126,7 +342,7 @@ function next() {
     banner.replaceChildren(h("div", { role: "alert", "data-automation-id": "errorBanner" }, `Errors Found: ${errors}`));
     return;
   }
-  fields.forEach((f) => f.commit());
+  live.forEach((f) => f.commit());
   state.page++;
   renderPage();
 }
@@ -141,6 +357,9 @@ function start(mode) {
 }
 
 setTimeout(() => {
+  // Tests of a single widget open "apply.html#page=<Page title>" to start there, applying manually.
+  const jump = PAGES.findIndex(([t]) => `#page=${encodeURIComponent(t)}` === location.hash);
+  if (jump >= 0) { state.page = jump; return start("manual"); }
   app.replaceChildren(
     h("h2", {}, "Example Role at Example Corp"),
     h("button", { type: "button", "data-automation-id": "adventureButton", onclick: () => {
