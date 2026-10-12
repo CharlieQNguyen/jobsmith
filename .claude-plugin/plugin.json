@@ -1,6 +1,6 @@
 {
   "name": "jobsmith",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Job search skills and a browser bridge for a jobsmith data repo: drive the Chrome you signed into with `jobsmith login`.",
   "author": {
     "name": "Charlie Nguyen",
