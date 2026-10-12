@@ -20,6 +20,8 @@ class ATS:
     password_selectors: tuple[str, ...]
     submit_selector: str | None = None
     """Button to click after filling. None presses Enter in the password field."""
+    illegal_characters: str = ""
+    """Characters its text fields reject; `jobsmith.textsafe.sanitize` replaces them before filling."""
 
     def matches(self, host: str) -> bool:
         return any(fnmatch(host.lower(), p) for p in self.host_patterns)

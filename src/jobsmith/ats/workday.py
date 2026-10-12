@@ -10,4 +10,6 @@ WORKDAY = ATS(
     password_selectors=('[data-automation-id="password"]', 'input[type="password"]'),
     # A transparent click_filter overlay covers Workday's submit button; Enter avoids it.
     submit_selector=None,
+    # Text fields answer "Error: Contains illegal characters" for any of these.
+    illegal_characters='<>[]"{}\\',
 )

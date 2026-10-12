@@ -74,6 +74,19 @@ Questions → Voluntary Disclosures → Self Identify → Review.
   `standard_answers` under a short snake_case key so next time it's automatic.
 - **Voluntary / EEO / self-identification:** use the profile's answers if present; otherwise ask.
   Never guess. "I don't wish to answer" is always acceptable.
+- **Characters the site rejects.** Workday text fields refuse `< > [ ] " { } \` ("Error:
+  Contains illegal characters"). Before typing free text there (job titles, role descriptions,
+  answers), run it through jobsmith's sanitizer, which uses jobsmith's own Python:
+
+  ```bash
+  "$(uv tool dir)/jobsmith/bin/python" -m jobsmith.textsafe --ats workday <<'EOF'
+  <the text>
+  EOF
+  ```
+
+  It prints `{"text": …, "changes": [{"from": "\"", "to": "'", "count": 2}, …]}`. Type `text`.
+  When `changes` isn't empty, tell the user what you replaced and in which field (e.g. "Role
+  Description 1: `"` → `'` twice"). Don't reword anything else.
 - Workday's submit and next buttons sometimes sit under a transparent `click_filter` overlay.
   If a click does nothing, click the overlay element or press Enter.
 - Validation errors: read them, fix them, and mention anything you had to guess.
