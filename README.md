@@ -32,9 +32,9 @@ You need [uv](https://docs.astral.sh/uv/), git, and Google Chrome (for browser f
 
 ```bash
 uv tool install git+https://github.com/CharlieQNguyen/jobsmith
-jobsmith init ~/Developer/jobsmith-hq
-cd ~/Developer/jobsmith-hq
-gh repo create jobsmith-hq --private --source . --push   # or any private remote
+jobsmith init ~/Developer/my-job-search
+cd ~/Developer/my-job-search
+gh repo create my-job-search --private --source . --push   # or any private remote
 ```
 
 `jobsmith init` creates your data repo and wires up Claude Code:
