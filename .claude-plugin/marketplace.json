@@ -10,7 +10,7 @@
   "plugins": [
     {
       "name": "jobsmith",
-      "source": "./plugin",
+      "source": "./",
       "description": "Job search skills and a browser bridge for a jobsmith data repo"
     }
   ]
