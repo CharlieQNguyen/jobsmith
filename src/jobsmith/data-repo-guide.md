@@ -12,6 +12,8 @@ this repo. This guide ships with jobsmith: `jobsmith init --force .` writes it t
 - `resumes/` — JSON Resume files. `base.json` is the master; tailored copies are named
   `YYYY-MM-<company>-<role>.json`. Never edit `base.json` just to tailor for one job. PDFs are
   rendered from them (`jobsmith resume render`) and sit beside them with the same name.
+  Applications take contact details and the postal address from `base.json` `basics` (`name`,
+  `email`, `phone`, and `location` with `address`, `city`, `region`, `postalCode`, `countryCode`).
 - `cover-letters/` — Markdown, named like the tailored resume.
 - `applications/` — one `<company>-<role>.md` per job: YAML frontmatter (schema: `Application` in
   jobsmith's `src/jobsmith/models.py`) plus free-form notes. Append to `events` rather than
