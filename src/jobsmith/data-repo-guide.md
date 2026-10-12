@@ -1,9 +1,9 @@
 # jobsmith data repo
 
 This repo holds one person's job search data. It is **private**. The tool that reads it is
-jobsmith, a **public** repo included as a submodule at `tools/jobsmith` (see
-`tools/jobsmith/CLAUDE.md`). This guide lives in jobsmith and is imported by the data repo's
-CLAUDE.md, so it updates with the submodule.
+jobsmith (https://github.com/CharlieQNguyen/jobsmith), which is **public** and is not part of
+this repo. This guide ships with jobsmith: `jobsmith init --force .` writes it to
+`.jobsmith/guide.md`, which this repo's CLAUDE.md imports.
 
 ## Layout
 
@@ -14,7 +14,7 @@ CLAUDE.md, so it updates with the submodule.
   rendered from them (`jobsmith resume render`) and sit beside them with the same name.
 - `cover-letters/` — Markdown, named like the tailored resume.
 - `applications/` — one `<company>-<role>.md` per job: YAML frontmatter (schema: `Application` in
-  `tools/jobsmith/src/jobsmith/models.py`) plus free-form notes. Append to `events` rather than
+  jobsmith's `src/jobsmith/models.py`) plus free-form notes. Append to `events` rather than
   rewriting history; keep `status` and `next_followup` current.
 - `linkedin/` — drafted posts and profile text.
 - `accounts.yaml` — which site accounts exist (host, username, created, login_url). **No
@@ -22,11 +22,9 @@ CLAUDE.md, so it updates with the submodule.
 
 ## Commands
 
-`jobsmith` is installed as an editable uv tool from `tools/jobsmith` in the main checkout.
-`tools/jobsmith/scripts/sync.sh` keeps it installed and reinstalls when dependencies change; it
-runs on Claude Code session start and after git merge/checkout. Commands find the data from the
-current directory (nearest folder with `accounts.yaml`), so they act on whichever checkout or
-worktree you're in.
+`jobsmith` is a uv tool: `uv tool install git+https://github.com/CharlieQNguyen/jobsmith`, and
+`uv tool upgrade jobsmith` to update it. Commands find the data from the current directory
+(nearest folder with `accounts.yaml`), so they act on whichever checkout or worktree you're in.
 
 - `jobsmith check` — validate all data files
 - `jobsmith apps add --company … --role … [--url …]` — start tracking; prints the slug
@@ -37,30 +35,27 @@ worktree you're in.
 - `jobsmith resume render [resumes/<file>.json] [--bullets N] [--full-roles N] [--html]` — PDF
   in the one-page compact layout (default `resumes/base.json`); warns if it overflows a page
 - `jobsmith browser status` — is the signed-in Chrome up?
-- `jobsmith init --force .` — refresh this repo's scaffolding from the current jobsmith (never
-  touches your data files)
+- `jobsmith init --force .` — refresh this repo's wiring and this guide from the installed
+  jobsmith, and record its version in `.jobsmith/version` (never touches your data files).
+- `jobsmith init --check .` — what is out of step: the plugin and CLI versions, this repo's
+  recorded version, its wiring. The plugin runs it at session start and shows any line it prints.
 
 ## Claude Code plugin
 
-`.claude/settings.json` registers `tools/jobsmith` as a local plugin marketplace and enables the
+`.claude/settings.json` registers jobsmith's GitHub repo as a plugin marketplace and enables the
 `jobsmith` plugin for this repo only. It provides the `jobsmith-browser` MCP server and the
 `/jobsmith:*` skills — `apply` (job URL → submitted application), `track` (status news,
-follow-ups) and `import-linkedin` (seed the profile and base resume from your LinkedIn). It
-loads in place from the submodule, so it always matches the pinned CLI.
+follow-ups) and `import-linkedin` (seed the profile and base resume from your LinkedIn). Update
+it with `/plugin marketplace update jobsmith`, at the same time as the CLI.
 
-## Sessions, worktrees and development
+## Sessions and worktrees
 
-- Sessions often run in a **git worktree** of this repo. The session-start hook checks out the
-  submodule there. Data commands act on the worktree's files; `/jobsmith:land` gets them to
-  `main`. The global `jobsmith` command still runs the main checkout's code. To test jobsmith
-  changes made in a worktree, use `uv run --project tools/jobsmith jobsmith …`.
+- Sessions often run in a **git worktree** of this repo. Data commands act on the worktree's
+  files, and the work reaches `main` when the session lands.
 - The browser profile is per user (`~/.local/share/jobsmith/chrome-profile`), so sign-ins carry
   over between sessions and worktrees.
-- **Project status and next steps:** `tools/jobsmith/docs/ROADMAP.md`. Read it before
-  development work and update it when something ships.
-- To hand work to a fresh session, start it in this repo, not in `tools/jobsmith`, so this guide,
-  the plugin and the hooks load. Put the task and any context not written down here in its
-  first message, and end it with "finish with /jobsmith:land".
+- To hand work to a fresh session, start it in this repo so this guide and the plugin load. Put
+  the task and any context not written down here in its first message.
 
 ## Signing in to sites
 
@@ -74,11 +69,10 @@ loads in place from the submodule, so it always matches the pinned CLI.
 
 ## Rules
 
-- `tools/jobsmith` is **public**. Never copy anything from this repo into it. Its pre-commit hook
-  blocks obvious leaks; don't rely on it.
-- **Every change lands through a PR, squash-merged**, in both repos. Finish every working session
-  with `/jobsmith:land`: it lands jobsmith first, repoints `tools/jobsmith` at the squash
-  commit, then lands this repo, and updates the main checkout. Don't push to `main` directly.
+- jobsmith is **public**. Never copy anything from this repo into it, or into an issue or pull
+  request on it. Its pre-commit hook blocks obvious leaks; don't rely on it.
+- Land work the way this repo's own notes in CLAUDE.md say. Without a rule there, commit on a
+  branch and open a pull request; don't push to `main` directly.
 - Credentials: never read, print, or type passwords, and never run `jobsmith login` or
   `jobsmith creds copy` — those are the user's steps. Claude takes over after login.
 - Browser actions on third-party sites (Workday, LinkedIn): confirm before entering personal data

@@ -1,7 +1,8 @@
 # jobsmith
 
 Public, MIT-licensed Python tool (uv, src layout, Python ≥3.12). Users keep their data in a
-separate private repo that includes this one as a submodule at `tools/jobsmith`.
+separate private repo, which uses jobsmith as an installed command and Claude Code plugin and
+holds no copy of it.
 
 ## Rules
 
@@ -14,20 +15,19 @@ separate private repo that includes this one as a submodule at `tools/jobsmith`.
 - Data is plain files so humans and agents can edit it and diffs stay readable. Add fields to the
   pydantic models in `models.py` rather than inventing ad-hoc keys.
 
-Status and next steps: `docs/ROADMAP.md`. Read it first; update it when something ships.
-
 ## Layout
 
 - `models.py` / `store.py` — data file schemas and plain-file read/write
 - `credentials.py` — OS keychain; `browser.py` — CDP Chrome + `fill_login`
 - `ats/` — one declarative module per applicant tracking system, `REGISTRY` in `__init__.py`;
   fake sign-in pages in `tests/fixtures/ats/<name>/` (see the `add-ats` skill)
-- `scaffold.py` — `jobsmith init`. Data repos *reference* `docs/data-repo-guide.md` and
-  `scripts/sync.sh` rather than copying them, so improvements ship via the submodule. Change
-  those files here, not in a data repo.
+- `scaffold.py` — `jobsmith init`. It writes `src/jobsmith/data-repo-guide.md` into a data repo
+  as `.jobsmith/guide.md`, and `init --check` reports when that or other wiring is stale. Change
+  the guide here, not in a data repo.
 - `.claude-plugin/marketplace.json` + `plugin/` — the Claude Code plugin data repos enable
-  (user-facing skills in `plugin/skills/`, `jobsmith-browser` MCP server). Developer skills stay
-  in `.claude/skills/`. Validate with `claude plugin validate .`
+  (user-facing skills in `plugin/skills/`, `jobsmith-browser` MCP server, a SessionStart hook in
+  `plugin/hooks/`). Developer skills stay in `.claude/skills/`. Validate with
+  `claude plugin validate .`
 
 ## Commands
 
@@ -36,6 +36,5 @@ Status and next steps: `docs/ROADMAP.md`. Read it first; update it when somethin
 - `uv run ruff check && uv run ruff format --check` — lint
 - `uv run jobsmith --data examples apps list` — try the CLI against example data
 
-Changes land through squash-merged PRs. Standalone, use `/ship`. From a data repo, use
-`/jobsmith:land`, which lands jobsmith first and then repoints the data repo's submodule at the
-squash commit.
+Changes land through squash-merged PRs, with `/ship`. To try a change against real data, install
+this checkout with `uv tool install --editable .` and run the data repo's session as usual.

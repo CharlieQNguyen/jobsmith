@@ -4,5 +4,6 @@ User-facing skills for people *using* jobsmith in a data repo live here, one fol
 Skills for *developing* jobsmith (`ship`, `add-ats`) live in `.claude/skills/` at the repo root
 instead, so they load only when working on jobsmith itself.
 
-The plugin is served from the data repo's `tools/jobsmith` submodule through a local-directory
-marketplace, so it loads in place: skills always match the pinned CLI, with no plugin update step.
+Data repos install the plugin from this repo's GitHub marketplace. `hooks/session-start.sh` checks
+at the start of each session that the `jobsmith` command is installed and that the data repo's
+wiring matches it (`jobsmith init --check`).

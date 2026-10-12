@@ -8,18 +8,19 @@ tailoring resumes, tracking follow-ups, filling Workday forms, drafting LinkedIn
 
 ## How it works
 
-jobsmith is the **tool**. Your **data** lives in a separate, private repo that
-includes jobsmith as a git submodule. Nothing personal ever goes in this repo.
+jobsmith is the **tool**, installed as a command and a Claude Code plugin. Your **data** lives
+in a separate, private repo of plain files. Nothing personal ever goes in this repo, and
+nothing of jobsmith's is copied into yours beyond a little wiring.
 
 ```
 your-private-repo/
-├── tools/jobsmith/        ← this repo (submodule)
 ├── profile/profile.yaml   contact info, work authorization, standard answers
 ├── resumes/               JSON Resume files: base.json + tailored versions
 ├── cover-letters/
 ├── applications/          one Markdown file per application (YAML frontmatter + notes)
 ├── linkedin/
-└── accounts.yaml          which site accounts exist (passwords live in the OS keychain)
+├── accounts.yaml          which site accounts exist (passwords live in the OS keychain)
+└── .jobsmith/guide.md     the agent guide, written by `jobsmith init`
 ```
 
 See [`examples/`](examples/) for the file formats. Resumes use the
@@ -30,35 +31,40 @@ See [`examples/`](examples/) for the file formats. Resumes use the
 You need [uv](https://docs.astral.sh/uv/), git, and Google Chrome (for browser features). Then:
 
 ```bash
-uvx --from git+https://github.com/CharlieQNguyen/jobsmith jobsmith init ~/job-search
-cd ~/job-search
-gh repo create job-search --private --source . --push   # or any private remote
+uv tool install git+https://github.com/CharlieQNguyen/jobsmith
+jobsmith init ~/Developer/jobsmith-hq
+cd ~/Developer/jobsmith-hq
+gh repo create jobsmith-hq --private --source . --push   # or any private remote
 ```
 
-`jobsmith init` creates your data repo, adds jobsmith as a submodule, installs the `jobsmith`
-command, and wires up Claude Code:
+`jobsmith init` creates your data repo and wires up Claude Code:
 
-- `CLAUDE.md` imports jobsmith's [data repo guide](docs/data-repo-guide.md) (it updates with the
-  submodule) and leaves room for your own notes
-- a SessionStart hook and git hooks that keep `jobsmith` installed and up to date
-- the `jobsmith` Claude Code plugin, enabled for that repo only and served from the submodule:
-  job-search skills (`/jobsmith:*`) and a `jobsmith-browser` MCP server so Claude can drive the
-  browser you sign into
+- `CLAUDE.md` imports jobsmith's [data repo guide](src/jobsmith/data-repo-guide.md), written to
+  `.jobsmith/guide.md`, and leaves room for your own notes
+- the `jobsmith` Claude Code plugin from this repo's marketplace, enabled for that repo only:
+  job-search skills (`/jobsmith:*`), a `jobsmith-browser` MCP server so Claude can drive the
+  browser you sign into, and a session-start check that the command is installed and the wiring
+  is current
 
 | Skill | What it does |
 |---|---|
 | `/jobsmith:apply <url>` | Records the job, gets you signed in, fills the application from your profile, and submits only when you say so |
 | `/jobsmith:import-linkedin` | Reads your own LinkedIn profile (a few pages, human-paced) and fills your profile and base resume after you review it |
 | `/jobsmith:track <news>` | "Acme rejected me", "screen with Globex Tuesday", "what's due?" |
-| `/jobsmith:land` | End of session: squash-merge PRs (jobsmith first, then your data repo) and update your main checkout |
 
-Run `jobsmith init --force .` later to refresh that wiring. It never touches your data.
-On another machine, clone with `git clone --recurse-submodules`.
+Run `jobsmith init --force .` later to refresh that wiring. It never touches your data. The data
+repo records the jobsmith version it was set up with in `.jobsmith/version`, and at the start of
+each session the plugin says when that, the CLI and the plugin disagree. Update with
+`uv tool upgrade jobsmith` and `/plugin marketplace update jobsmith`.
+
+A data repo made by an older jobsmith has jobsmith as a submodule at `tools/jobsmith`. Remove it
+(`git rm tools/jobsmith`), run `jobsmith init --force .`, and change the first line of
+`CLAUDE.md` to `@.jobsmith/guide.md`.
 
 ## Commands
 
 ```bash
-jobsmith init [DIR] [--force]              # create or refresh a data repo
+jobsmith init [DIR] [--force | --check]  # create or refresh a data repo
 jobsmith check                           # validate all data files
 jobsmith apps add --company C --role R [--url URL]   # start tracking (detects the ATS)
 jobsmith apps update QUERY [--status S] [--event TEXT] [--followup +7d]
@@ -73,8 +79,7 @@ jobsmith login HOST [--url LOGIN_PAGE]   # sign in there with the keychain passw
 ```
 
 Commands find the data directory from `--data`, then the nearest data repo at or above the current
-directory, then `$JOBSMITH_DATA`, then the current directory. See [the roadmap](docs/ROADMAP.md)
-for what's built and what's next.
+directory, then `$JOBSMITH_DATA`, then the current directory.
 
 ## Supported applicant tracking systems
 
@@ -114,12 +119,12 @@ While the port is open, any program on your machine can drive that browser. Run
 git config core.hooksPath .githooks   # blocks commits that look like personal data
 uv run pytest                         # browser tests need Chrome; skip with -m "not browser"
 uv run ruff check
+uv tool install --editable .          # the `jobsmith` command runs this checkout
 ```
 
 Working with Claude Code in this repo gives you two skills:
 
-- `/ship` — format, lint, test, review the diff for personal data, commit and push; when jobsmith
-  is a submodule, also commit the new pointer in the data repo, in the right order
+- `/ship` — format, lint, test, review the diff for personal data, commit, push and merge
 - `add-ats` — add or fix an applicant tracking system with a fake sign-in page and a headless test
 
 ## License
