@@ -31,9 +31,9 @@ See [`examples/`](examples/) for the file formats. Resumes use the
 You need [uv](https://docs.astral.sh/uv/), git, and Google Chrome (for browser features). Then:
 
 ```bash
-uvx --from git+https://github.com/CharlieQNguyen/jobsmith jobsmith init ~/Developer/my-job-search
-cd ~/Developer/my-job-search
-gh repo create my-job-search --private --source . --push   # or any private remote
+uvx --from git+https://github.com/CharlieQNguyen/jobsmith jobsmith init ~/Developer/jobsmith-hq
+cd ~/Developer/jobsmith-hq
+gh repo create jobsmith-hq --private --source . --push   # or any private remote
 ```
 
 `jobsmith init` creates your data repo and wires up Claude Code. Open Claude Code there and
