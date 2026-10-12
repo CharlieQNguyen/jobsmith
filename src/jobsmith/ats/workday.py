@@ -10,6 +10,7 @@ apply skill (`plugin/skills/apply/SKILL.md`) carries the page-by-page guidance;
 
 from __future__ import annotations
 
+import re
 from typing import TYPE_CHECKING
 
 from jobsmith.ats import ATS
@@ -66,7 +67,9 @@ def select_one(scope: Page | Locator, option: str, label: str = "") -> None:
     that opens a listbox. For an application question, pass the question's group as `scope` and
     no label: every question's button is named just "Select One Required"."""
     page = getattr(scope, "page", scope)  # a Locator knows its page; a Page is one
-    scope.get_by_role("button", name=f"{label} Select One".strip()).click()
+    # Anchored, so label="State" never matches "Home State Select One Required".
+    name = re.compile(rf"^{re.escape(f'{label} Select One'.strip())}( Required)?$")
+    scope.get_by_role("button", name=name).click()
     page.get_by_role("listbox").get_by_role("option", name=option, exact=True).click()
 
 

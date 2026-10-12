@@ -323,6 +323,13 @@ def test_select_one_is_a_button_and_a_listbox_not_a_select(open_app):
     assert page.get_by_role("listbox").count() == 0
 
 
+def test_select_one_matches_the_whole_label(open_app):
+    page = open_app("My Information")
+    workday.select_one(page, "Oregon", label="State")
+    assert page.get_by_role("button", name="State Oregon Required", exact=True).is_visible()
+    assert page.get_by_role("button", name="Home State Select One", exact=True).is_visible()
+
+
 def test_question_dropdowns_are_found_by_their_group(open_app):
     page = open_app("Application Questions")
     with pytest.raises(PlaywrightError, match="strict mode violation"):

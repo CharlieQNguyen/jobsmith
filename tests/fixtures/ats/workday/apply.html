@@ -245,6 +245,8 @@ const PAGES = [
     textField(`${p}/Address Line 1`, "Address Line 1"),
     textField(`${p}/Address Line 2`, "Address Line 2", { optional: true }),
     textField(`${p}/City`, "City"),
+    // Optional, and named so that "State" is a substring of it.
+    selectOne(`${p}/Home State`, "Home State", ["California", "New York", "Oregon", "Texas", "Washington"], { optional: true }),
     selectOne(`${p}/State`, "State", ["California", "New York", "Oregon", "Texas", "Washington"]),
     textField(`${p}/Postal Code`, "Postal Code"),
     textField(`${p}/Email Address`, "Email Address"),
