@@ -1,0 +1,154 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Workday application (fake)</title>
+<style>
+  body { font: 14px sans-serif; margin: 16px; }
+  .field { margin: 8px 0; }
+  label[data-required]::after { content: " *"; color: #b00; }
+  [data-automation-id="errorMessage"] { color: #b00; margin: 2px 0; }
+  .footer { position: relative; display: inline-block; margin-top: 16px; }
+  [data-automation-id="click_filter"] { position: absolute; inset: 0; }
+</style>
+<div id="app">Loading…</div>
+<script>
+// A fake Workday application: the structure jobsmith's guidance relies on (data-automation-id
+// attributes, the start dialog, page-by-page validation, the click_filter overlay over Next and
+// Submit, a file input for the resume), and nothing copied from Workday itself.
+// On Submit the page is replaced by <output id="jobsmith-result"> holding JSON of every value
+// the application committed: {"mode": "manual" | "autofill", "values": {"<Page>/<Field>": …}}.
+const ILLEGAL = /[<>\[\]"{}\\]/;
+const state = { mode: null, page: 0, values: {} };
+const h = (tag, attrs = {}, ...kids) => {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
+    else if (v !== null && v !== undefined && v !== false) el.setAttribute(k, v === true ? "" : v);
+  }
+  el.append(...kids.flat());
+  return el;
+};
+let uid = 0;
+const nextId = () => `f${++uid}`;
+
+// --- fields -------------------------------------------------------------------------------
+// Each field returns an element and registers a check(): an error string or null, and a
+// commit() that stores its value under its path.
+let fields = [];
+
+function showError(wrapper, msg) {
+  wrapper.querySelector('[data-automation-id="errorMessage"]')?.remove();
+  const input = wrapper.querySelector("input, textarea");
+  if (!msg) { input?.removeAttribute("aria-invalid"); return; }
+  const id = nextId();
+  wrapper.append(h("p", { "data-automation-id": "errorMessage", id }, msg));
+  input?.setAttribute("aria-invalid", "true");
+  input?.setAttribute("aria-describedby", id);
+}
+
+function textField(path, label, { required = true, multiline = false } = {}) {
+  const id = nextId();
+  const input = h(multiline ? "textarea" : "input", { id, type: multiline ? null : "text", "aria-required": required ? "true" : null });
+  const wrapper = h("div", { class: "field", "data-automation-id": `formField-${label}` },
+    h("label", { for: id, "data-required": required }, label), input);
+  const check = () => {
+    const v = input.value.trim();
+    if (required && !v) return `Error: The field ${label} is required and must have a value.`;
+    if (ILLEGAL.test(v)) return "Error: Contains illegal characters";
+    return null;
+  };
+  input.addEventListener("blur", () => showError(wrapper, check()));
+  fields.push({ wrapper, check, commit: () => { if (input.value.trim()) state.values[path] = input.value.trim(); } });
+  return wrapper;
+}
+
+function resumeUpload(path) {
+  const id = nextId();
+  const input = h("input", { id, type: "file", accept: ".pdf", "data-automation-id": "file-upload-input-ref", "aria-label": "Resume/CV" });
+  const done = h("div", { "data-automation-id": "file-upload-successful" });
+  input.addEventListener("change", () => { done.textContent = input.files[0]?.name ?? ""; });
+  const wrapper = h("div", { role: "group", "aria-label": "Resume/CV", class: "field" },
+    h("h3", {}, "Resume/CV"), input, done);
+  fields.push({
+    wrapper,
+    check: () => (done.textContent ? null : "Error: Upload a resume."),
+    commit: () => { state.values[path] = done.textContent; },
+  });
+  return wrapper;
+}
+
+// --- pages --------------------------------------------------------------------------------
+const PAGES = [
+  ["My Information", (p) => [
+    textField(`${p}/First Name`, "First Name"),
+    textField(`${p}/Last Name`, "Last Name"),
+    textField(`${p}/Address Line 1`, "Address Line 1"),
+    textField(`${p}/Address Line 2`, "Address Line 2", { required: false }),
+    textField(`${p}/City`, "City"),
+    textField(`${p}/Postal Code`, "Postal Code"),
+    textField(`${p}/Email Address`, "Email Address"),
+    textField(`${p}/Phone Number`, "Phone Number"),
+  ]],
+  ["My Experience", (p) => [
+    resumeUpload(`${p}/Resume/CV`),
+  ]],
+  ["Review", () => []],
+];
+
+function footerButton(label, onActivate) {
+  // The button sits under a transparent overlay that takes the pointer; the overlay's click
+  // (or Enter on the focused button) is what moves the application on.
+  const button = h("button", { type: "button", "data-automation-id": "bottom-navigation-next-button" }, label);
+  button.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); onActivate(); } });
+  return h("div", { class: "footer" }, button,
+    h("div", { "data-automation-id": "click_filter", onclick: onActivate }));
+}
+
+function renderPage() {
+  fields = [];
+  const [title, build] = PAGES[state.page];
+  const last = state.page === PAGES.length - 1;
+  app.replaceChildren(
+    h("h2", { "data-automation-id": "pageHeader" }, title),
+    h("div", { id: "banner" }),
+    h("form", { onsubmit: (e) => e.preventDefault() }, build(title)),
+    footerButton(last ? "Submit" : "Save and Continue", last ? submit : next),
+  );
+}
+
+function next() {
+  let errors = 0;
+  for (const f of fields) {
+    const msg = f.check();
+    showError(f.wrapper, msg);
+    if (msg) errors++;
+  }
+  if (errors) {
+    banner.replaceChildren(h("div", { role: "alert", "data-automation-id": "errorBanner" }, `Errors Found: ${errors}`));
+    return;
+  }
+  fields.forEach((f) => f.commit());
+  state.page++;
+  renderPage();
+}
+
+function submit() {
+  app.replaceChildren(h("output", { id: "jobsmith-result" }, JSON.stringify({ mode: state.mode, values: state.values })));
+}
+
+function start(mode) {
+  state.mode = mode;
+  renderPage();
+}
+
+setTimeout(() => {
+  app.replaceChildren(
+    h("h2", {}, "Example Role at Example Corp"),
+    h("button", { type: "button", "data-automation-id": "adventureButton", onclick: () => {
+      app.append(h("div", { role: "dialog", "aria-label": "Start Your Application" },
+        h("a", { role: "button", href: "#", "data-automation-id": "autofillWithResume", onclick: (e) => { e.preventDefault(); start("autofill"); } }, "Autofill with Resume"),
+        h("a", { role: "button", href: "#", "data-automation-id": "applyManually", onclick: (e) => { e.preventDefault(); start("manual"); } }, "Apply Manually"),
+      ));
+    } }, "Apply"),
+  );
+}, 300);
+</script>

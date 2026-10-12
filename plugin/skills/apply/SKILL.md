@@ -110,9 +110,14 @@ has **separate** accounts.
 
 ## 4. Confirm the data before entering it
 
-In the signed-in tab, open the posting and start the application (on Workday: *Apply* → *Apply
-Manually*, or *Autofill with Resume* if they prefer). Before typing anything, show the user
-in one short list what you'll enter: contact details, work authorization/sponsorship, which
+In the signed-in tab, open the posting and start the application. **On Workday choose *Apply*
+→ *Apply Manually*,** never *Autofill with Resume*: Workday's resume parsing mangles the data
+(wrong job titles, section headings taken for company names, blank companies, months set to
+January, guessed graduation years), and every field then needs checking and fixing anyway.
+You fill every field yourself from `resumes/base.json` and still upload the resume PDF.
+
+Before typing anything, show the user in one short list what you'll enter: contact details,
+work history and education from `base.json`, work authorization/sponsorship, which
 `standard_answers` apply, and the resume file. Proceed once they say yes. That approval
 covers filling the fields; it does not cover submitting.
 
@@ -123,8 +128,12 @@ Questions → Voluntary Disclosures → Self Identify → Review.
 
 - Take a snapshot at the start of each page, fill from the sources in step 1, and check the
   values landed.
-- Upload the resume with the file-upload tool when the page asks for it. After autofill, check
-  work history and education against `resumes/base.json` and fix mistakes.
+- **Work history and education** come from `resumes/base.json` (`work`, `education`), one
+  group per entry, newest first, even when you send a tailored resume: the PDF carries the
+  tailoring.
+- **Upload the resume PDF** from step 1 in the Resume/CV section (on Workday, My Experience)
+  with the file-upload tool, and check its file name shows as uploaded. Applying manually
+  doesn't skip this.
 - **Question not covered by the profile:** ask the user. Offer to save the answer to
   `standard_answers` under a short snake_case key so next time it's automatic.
 - **Voluntary / EEO / self-identification:** use the profile's answers if present; otherwise ask.

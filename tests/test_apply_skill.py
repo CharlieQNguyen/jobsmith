@@ -69,3 +69,11 @@ def test_fallback_script_reads_the_open_tab_and_leaves_it_open(signed_in_chrome)
     assert out.stdout.startswith(f"Workday sign-in (fake) {page.url}\n")
     assert 'textbox "Email Address"' in out.stdout
     assert page.locator('[data-automation-id="email"]').is_visible()
+
+
+def test_workday_applications_start_manually_and_still_upload_the_resume():
+    confirm = section("4. Confirm the data before entering it")
+    assert "**On Workday choose *Apply*\n→ *Apply Manually*,** never *Autofill with Resume*" in confirm
+    fill = section("5. Fill it in")
+    assert "**Upload the resume PDF**" in fill
+    assert "After autofill" not in SKILL

@@ -1,0 +1,37 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jsonresume/resume-schema/v1.0.0/schema.json",
+  "basics": {
+    "name": "Alex Example",
+    "email": "alex@example.com",
+    "phone": "+1 555-0100",
+    "url": "https://alex.example.com",
+    "location": {
+      "address": "100 Example Street\nApt 4",
+      "postalCode": "97201",
+      "city": "Portland",
+      "region": "Oregon",
+      "countryCode": "US"
+    },
+    "profiles": [{ "network": "LinkedIn", "username": "alex-example", "url": "https://www.linkedin.com/in/alex-example" }]
+  },
+  "work": [
+    {
+      "name": "Example Payments Inc.",
+      "position": "Software Engineer",
+      "location": "Portland, OR",
+      "startDate": "2022-03",
+      "summary": "Moved billing from a monolith -> event-driven services; built the \"Atlas\" API gateway."
+    },
+    {
+      "name": "Sample Retail Co.",
+      "position": "Junior Developer",
+      "location": "Portland, OR",
+      "startDate": "2019-06",
+      "endDate": "2022-02",
+      "summary": "Wrote the inventory sync that replaced nightly CSV imports."
+    }
+  ],
+  "education": [
+    { "institution": "Example State University", "studyType": "B.A.", "area": "Computer Science", "startDate": "2015", "endDate": "2019" }
+  ]
+}
