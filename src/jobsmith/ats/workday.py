@@ -75,11 +75,13 @@ def select_one(scope: Page | Locator, option: str, label: str = "") -> None:
 
 def search_prompt(field: Locator, query: str, option: str) -> None:
     """Choose `option` in a search prompt (Field of Study, Country Phone Code): type, press Enter,
-    then click the option named "<option> not checked". It then shows as
-    "<option>, press delete to clear value."."""
+    then click the option named "<option> not checked" in the prompt's own list (the one its
+    aria-controls names: another prompt's list may be open with the same options). It then
+    shows as "<option>, press delete to clear value."."""
     field.fill(query)
     field.press("Enter")
-    field.page.get_by_role("option", name=f"{option} not checked", exact=True).click()
+    own_list = field.page.locator(f'[id="{field.get_attribute("aria-controls")}"]')
+    own_list.get_by_role("option", name=f"{option} not checked", exact=True).click()
 
 
 def check_box(box: Locator) -> None:

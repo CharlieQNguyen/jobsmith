@@ -165,19 +165,27 @@ function searchPrompt(path, label, options, { optional = false } = {}) {
       onkeydown: (e) => { if (e.key === "Delete" || e.key === "Backspace") select(""); },
     }, o) : "");
     input.value = "";
-    closePopups();
+    closeList();
   };
+  // Each prompt's list belongs to it (aria-controls) and stays open until it picks or searches
+  // again, so another prompt's list can be open at the same time with the same option names.
+  let list = null;
+  const closeList = () => { list?.remove(); list = null; input.removeAttribute("aria-controls"); input.setAttribute("aria-expanded", "false"); };
   input.addEventListener("keydown", (e) => {
     if (e.key !== "Enter") return;
     e.preventDefault();
-    closePopups();
+    closeList();
     const q = input.value.trim().toLowerCase();
     const hits = options.filter((o) => o.toLowerCase().includes(q));
-    document.body.append(h("div", { role: "listbox", "data-popup": true },
+    const listId = nextId();
+    list = h("div", { role: "listbox", id: listId, "data-popup": true },
       hits.length ? hits.map((o) => h("div", {
         role: "option", "aria-label": `${o} ${o === value ? "checked" : "not checked"}`, "aria-selected": String(o === value),
         "data-automation-id": "promptOption", onclick: () => select(o),
-      }, o)) : h("p", {}, "No Items.")));
+      }, o)) : h("p", {}, "No Items."));
+    document.body.append(list);
+    input.setAttribute("aria-controls", listId);
+    input.setAttribute("aria-expanded", "true");
   });
   const wrapper = h("div", { class: "field", "data-automation-id": `formField-${label}` },
     h("label", { for: id, "data-required": !optional }, label), pills, input);

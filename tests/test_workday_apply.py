@@ -365,6 +365,23 @@ def test_search_prompt_helper(open_app):
     assert selected.is_visible()
 
 
+def test_search_prompt_picks_from_its_own_list(open_app):
+    page = open_app("My Experience")
+    education = group(page, "Education")
+    education.get_by_role("button", name="Add", exact=True).click()
+    education.get_by_role("button", name="Add Another", exact=True).click()
+    first = group(page, "Education 1").get_by_label("Field of Study")
+    first.fill("Computer")
+    first.press("Enter")  # its list stays open, with the same options as the second's
+    workday.search_prompt(
+        group(page, "Education 2").get_by_label("Field of Study"), "Computer", "Computer Engineering"
+    )
+    selected = "Computer Engineering, press delete to clear value."
+    assert group(page, "Education 2").get_by_role("button", name=selected).is_visible()
+    assert group(page, "Education 1").get_by_role("button", name=selected).count() == 0
+    assert page.get_by_role("listbox").count() == 1  # Education 1's list was open throughout
+
+
 def test_field_of_study_is_a_fixed_list(open_app):
     page = open_app("My Experience")
     group(page, "Education").get_by_role("button", name="Add", exact=True).click()
