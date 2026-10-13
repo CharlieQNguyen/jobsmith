@@ -161,8 +161,9 @@ Plain clicks and fills fail on several Workday widgets, often silently. Do it th
 re-read the snapshot after each one to check the value landed. With the fallback script from
 step 0, the helpers in `jobsmith.ats.workday` (`fill_date`, `select_one`, `search_prompt`,
 `check_box`) do exactly this, taking the `page` or a group (`page.get_by_role("group",
-name="Work Experience 1", exact=True)`). With the MCP tools, use `browser_run_code` for the
-Playwright steps if the server has it; otherwise as described per widget.
+name="Work Experience 1", exact=True)`). With the MCP tools, run the Playwright steps with
+`browser_run_code_unsafe` (older `@playwright/mcp` versions call it `browser_run_code`) if the
+server has it; otherwise as described per widget.
 
 | Widget | How to recognise it | What works |
 |---|---|---|

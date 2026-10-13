@@ -93,3 +93,4 @@ def test_the_skill_teaches_every_workday_widget_helper():
     ):
         assert shape in widgets
     assert "check(force=True)" in widgets
+    assert "`browser_run_code_unsafe`" in widgets  # the current @playwright/mcp name
