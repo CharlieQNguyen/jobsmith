@@ -1,5 +1,6 @@
 """The apply skill's instructions that can be checked without an agent: its order and its scripts."""
 
+import inspect
 import re
 import subprocess
 import sys
@@ -84,7 +85,8 @@ def test_the_skill_teaches_every_workday_widget_helper():
 
     widgets = SKILL.split("### Workday's widgets", 1)[1].split("\n## ", 1)[0]
     for helper in (workday.fill_date, workday.select_one, workday.search_prompt, workday.check_box):
-        assert f"`{helper.__name__}`" in widgets
+        params = ", ".join(inspect.signature(helper).parameters)
+        assert f"- `{helper.__name__}({params})`: " in widgets  # the skill says what each one takes
     for shape in (
         "dateSectionMonth-input",
         "Select One Required",
