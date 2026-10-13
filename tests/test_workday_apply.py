@@ -313,6 +313,31 @@ def test_date_takes_focus_type_and_tab(open_app):
     assert result(page)["values"]["Self Identify/Date"] == "10/12/2026"
 
 
+def test_refilling_a_date_replaces_it(open_app):
+    page = open_app("Self Identify")
+    self_identify_except_date(page)
+    date_group = group(page, "Date")
+    workday.fill_date(date_group, "10/12/2026")
+    workday.fill_date(date_group, "1/2/2027")  # unpadded, and over a full date
+    shown = [
+        date_group.locator(f'[data-automation-id="dateSection{s}-display"]').inner_text()
+        for s in ("Month", "Day", "Year")
+    ]
+    assert shown == ["01", "02", "2027"]
+    save_and_continue(page, "Review")
+    assert result(page)["values"]["Self Identify/Date"] == "01/02/2027"
+
+
+def test_a_date_that_does_not_fit_is_refused_before_typing(open_app):
+    page = open_app("Self Identify")
+    date_group = group(page, "Date")
+    with pytest.raises(ValueError, match="doesn't fit"):
+        workday.fill_date(date_group, "10/2026")  # this group has month, day and year
+    month = date_group.locator('[data-automation-id="dateSectionMonth-input"]')
+    assert month.input_value() == ""
+    assert not date_group.evaluate("g => g.contains(document.activeElement)")
+
+
 def test_select_one_is_a_button_and_a_listbox_not_a_select(open_app):
     page = open_app("My Information")
     button = page.get_by_role("button", name="Country Select One Required")

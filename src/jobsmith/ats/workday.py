@@ -43,23 +43,50 @@ CLICK_FILTER = '[data-automation-id="click_filter"]'
 # with Playwright over CDP (the skill's fallback); the skill gives the same steps for MCP tools.
 # `scope` is the page or a group within it, e.g. page.get_by_role("group", name="Work Experience 1").
 
-DATE_FIRST_SECTION = (
+DATE_SECTIONS = (
     '[data-automation-id="dateSectionMonth-input"], '
     '[data-automation-id="dateSectionDay-input"], '
     '[data-automation-id="dateSectionYear-input"]'
 )
+_DATE_SHAPES = {1: ((4, None),), 2: ((2, 12), (4, None)), 3: ((2, 12), (2, 31), (4, None))}
+"""Sections → (digits, maximum) for each: YYYY, MM/YYYY, MM/DD/YYYY."""
+
+
+def date_digits(value: str, sections: int) -> list[str]:
+    """Split "3/2022", "2022" or "3/5/2026" into zero-padded digits per section, or raise ValueError."""
+    parts = value.split("/")
+    shape = _DATE_SHAPES.get(sections)
+    if shape is None or len(parts) != sections:
+        raise ValueError(f"{value!r} doesn't fit a date with {sections} section(s)")
+    digits = []
+    for part, (width, maximum) in zip(parts, shape, strict=True):
+        ok = part.isascii() and part.isdigit() and len(part) <= width and int(part) >= 1
+        if not ok or (maximum is None and len(part) != width) or (maximum and int(part) > maximum):
+            raise ValueError(f"{value!r} isn't a valid date for {sections} section(s)")
+        digits.append(part.zfill(width))
+    return digits
 
 
 def fill_date(group: Locator, value: str) -> None:
-    """Type `value` ("MM/YYYY", "YYYY" or "MM/DD/YYYY") into a date group such as "From".
+    """Type `value` ("MM/YYYY", "YYYY" or "MM/DD/YYYY"; months and days may be unpadded) into a
+    date group such as "From". Raises ValueError, before touching the page, for a value that
+    doesn't fit the group's sections.
 
     The spinbuttons sit outside the viewport, so click() never lands, and they keep their own
-    digits, so fill() doesn't stick. Focus the first section, type the digits (each section moves
-    on by itself) and Tab out, which commits the date.
+    digits, so fill() doesn't stick. Each section is focused and emptied with Backspace (a full
+    section ignores more digits, so a refill would keep the old date), then the first is
+    focused, the digits typed (each section moves on by itself), and Tab commits the date.
     """
-    group.locator(DATE_FIRST_SECTION).first.focus()
-    group.page.keyboard.type(value.replace("/", ""))
-    group.page.keyboard.press("Tab")
+    sections = group.locator(DATE_SECTIONS)
+    digits = date_digits(value, sections.count())
+    keyboard = group.page.keyboard
+    for i, d in enumerate(digits):
+        sections.nth(i).focus()
+        for _ in d:
+            keyboard.press("Backspace")
+    sections.first.focus()
+    keyboard.type("".join(digits))
+    keyboard.press("Tab")
 
 
 def select_one(scope: Page | Locator, option: str, label: str = "") -> None:
