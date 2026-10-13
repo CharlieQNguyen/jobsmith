@@ -183,7 +183,7 @@ function searchPrompt(path, label, options, { optional = false } = {}) {
         role: "option", "aria-label": `${o} ${o === value ? "checked" : "not checked"}`, "aria-selected": String(o === value),
         "data-automation-id": "promptOption", onclick: () => select(o),
       }, o)) : h("p", {}, "No Items."));
-    document.body.append(list);
+    input.after(list);  // in the field, so an earlier field's list comes before a later one's
     input.setAttribute("aria-controls", listId);
     input.setAttribute("aria-expanded", "true");
   });
