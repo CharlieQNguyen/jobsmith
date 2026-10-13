@@ -94,3 +94,11 @@ def test_the_skill_teaches_every_workday_widget_helper():
         assert shape in widgets
     assert "check(force=True)" in widgets
     assert "`browser_run_code_unsafe`" in widgets  # the current @playwright/mcp name
+
+
+def test_nothing_is_submitted_without_the_users_yes():
+    rules = SKILL.split("## 0.", 1)[0]
+    assert "Never click a final submit without the user's explicit yes in this conversation." in rules
+    review = section("6. Review, then submit only on a yes")
+    assert 'Ask plainly: **"Submit this application?"** Submit only on a clear yes.' in review
+    assert "it does not cover submitting" in section("4. Confirm the data before entering it")
