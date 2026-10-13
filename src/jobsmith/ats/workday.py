@@ -67,19 +67,40 @@ def date_digits(value: str, sections: int) -> list[str]:
     return digits
 
 
+_DATE_KINDS = {("Year",): 1, ("Month", "Year"): 2, ("Month", "Day", "Year"): 3}
+_READ_DATE_SECTIONS = """els => ({
+    kinds: els.map((e) => e.dataset.automationId.replace(/^dateSection|-input$/g, "")),
+    groups: new Set(els.map((e) => e.closest('[role="group"]'))).size,
+})"""
+
+
+def date_sections(group: Page | Locator) -> int:
+    """How many sections the one date group in `group` has: 1 (YYYY), 2 (MM/YYYY) or 3
+    (MM/DD/YYYY). Raises ValueError if `group` holds no date, more than one date group (such as
+    "Education 1", which holds "From" and "To"), or sections in any other order."""
+    found = group.locator(DATE_SECTIONS).evaluate_all(_READ_DATE_SECTIONS)
+    kinds = tuple(found["kinds"])
+    if found["groups"] != 1 or kinds not in _DATE_KINDS:
+        raise ValueError(
+            f"pass a single date group such as 'From', not one holding {found['groups']} date group(s) "
+            f"with sections {', '.join(kinds) or 'none'}"
+        )
+    return _DATE_KINDS[kinds]
+
+
 def fill_date(group: Locator, value: str) -> None:
     """Type `value` ("MM/YYYY", "YYYY" or "MM/DD/YYYY"; months and days may be unpadded) into a
-    date group such as "From". Raises ValueError, before touching the page, for a value that
-    doesn't fit the group's sections.
+    single date group such as "From". Raises ValueError, before typing anything, when `group`
+    isn't exactly one date group (see `date_sections`) or `value` doesn't fit its sections.
 
     The spinbuttons sit outside the viewport, so click() never lands, and they keep their own
     digits, so fill() doesn't stick. Each section is focused and emptied with Backspace (a full
     section ignores more digits, so a refill would keep the old date), then the first is
     focused, the digits typed (each section moves on by itself), and Tab commits the date.
     """
+    digits = date_digits(value, date_sections(group))
     sections = group.locator(DATE_SECTIONS)
-    digits = date_digits(value, sections.count())
-    keyboard = group.page.keyboard
+    keyboard = getattr(group, "page", group).keyboard  # a Locator knows its page; a Page is one
     for i, d in enumerate(digits):
         sections.nth(i).focus()
         for _ in d:

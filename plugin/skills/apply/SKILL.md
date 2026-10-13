@@ -163,11 +163,13 @@ step 0, the helpers in `jobsmith.ats.workday` do exactly this. Each takes the wi
 what holds it:
 
 - `fill_date(group, value)`: the date group itself, e.g. `job.get_by_role("group", name="From",
-  exact=True)` where `job` is the "Work Experience 1" group. Never pass anything wider: it
-  reads the value by counting the group's sections, and usually raises ValueError otherwise.
+  exact=True)` where `job` is the "Work Experience 1" group. It raises ValueError, before
+  typing anything, when given a scope holding more than one date (such as "Education 1", which
+  holds "From" and "To (Actual or Expected)") or a value that doesn't fit the date's sections.
 - `select_one(scope, option, label)`: the `page`, or a group holding the dropdown; for an
   application question, the question's group and no label.
-- `search_prompt(field, query, option)`: the prompt's textbox, e.g. `get_by_label("Field of Study")`.
+- `search_prompt(field, query, option)`: the prompt's textbox, e.g.
+  `school.get_by_label("Field of Study")` where `school` is the "Education 1" group.
 - `check_box(box)`: the checkbox, e.g. `get_by_label("Full-time")` in its question's group.
 
 With the MCP tools, run the Playwright steps with `browser_run_code_unsafe` (older
@@ -180,7 +182,7 @@ described per widget.
 | Select One | A button named "<Label> Select One Required" that opens a listbox | Not `select_option` (it isn't a `<select>`). Click the button, then the option by its exact name. Afterwards the button reads "<Label> <Value> Required". |
 | Application question | A group named by the question text, holding a button named just "Select One Required" | Every question's button has that same name: find the question's group first, then its button, then the option. |
 | Search prompt | A textbox (Field of Study, Country Phone Code, …) with a "Search" placeholder | Type a short search term and press Enter; nothing is listed until Enter, and typed text alone selects nothing. Click the option named "<Value> not checked". The selection then shows as "<Value>, press delete to clear value." |
-| Repeating group | Sections Work Experience, Education, Websites with an "Add" button, then "Add Another" | Each click adds a group named "Work Experience 1", "Education 1", "Websites 1"… Fill each through its group: Job Title, Company, Location, "I currently work here" (hides "To"), dates "From"/"To", Role Description; School or University, Degree, Field of Study; URL. |
+| Repeating group | Sections Work Experience, Education, Websites with an "Add" button, then "Add Another" | Each click adds a group named "Work Experience 1", "Education 1", "Websites 1"… Fill each through its group: Job Title, Company, Location, "I currently work here" (hides "To"), date groups "From" and "To", Role Description; School or University, Degree, Field of Study, date groups "From" and "To (Actual or Expected)" (years only); URL. Fill each date through its own date group, never through the entry's group. |
 | Checkbox grid | Several checkboxes in one question group (employment type, disability status) | A panel over each box takes the pointer, so `check()` times out. Use `check(force=True)`. MCP: `browser_evaluate` on the box's ref with `(el) => el.click()`. |
 
 - **Degree** names differ from JSON Resume's `studyType`: "B.A." is "Bachelor of Arts (B.A)",

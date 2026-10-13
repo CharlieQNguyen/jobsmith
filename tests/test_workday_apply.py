@@ -338,6 +338,66 @@ def test_a_date_that_does_not_fit_is_refused_before_typing(open_app):
     assert not date_group.evaluate("g => g.contains(document.activeElement)")
 
 
+def year_shown(scope, name: str) -> str:
+    return group(scope, name).locator('[data-automation-id="dateSectionYear-display"]').inner_text()
+
+
+def test_fill_date_refuses_a_group_holding_two_dates(open_app):
+    page = open_app("My Experience")
+    group(page, "Education").get_by_role("button", name="Add", exact=True).click()
+    school = group(page, "Education 1")
+    workday.fill_date(group(school, "From"), "2015")
+    workday.fill_date(group(school, "To (Actual or Expected)"), "2019")
+    for value in ("03/2019", "2019"):  # MM/YYYY would fit two sections; YYYY fits one
+        with pytest.raises(ValueError, match="single date group"):
+            workday.fill_date(school, value)
+    assert (year_shown(school, "From"), year_shown(school, "To (Actual or Expected)")) == ("2015", "2019")
+    with pytest.raises(ValueError, match="single date group"):
+        workday.fill_date(page, "2019")  # the whole page: one more way to be too wide
+    assert (year_shown(school, "From"), year_shown(school, "To (Actual or Expected)")) == ("2015", "2019")
+
+
+def test_fill_date_refuses_an_empty_group_holding_two_dates_without_typing(open_app):
+    page = open_app("My Experience")
+    group(page, "Education").get_by_role("button", name="Add", exact=True).click()
+    school = group(page, "Education 1")
+    with pytest.raises(ValueError, match="single date group"):
+        workday.fill_date(school, "09/2015")
+    assert (year_shown(school, "From"), year_shown(school, "To (Actual or Expected)")) == ("YYYY", "YYYY")
+
+
+DATE_SECTION = '<input data-automation-id="dateSection{}-input">'
+
+
+@pytest.mark.parametrize(
+    ("html", "why"),
+    [
+        (  # Month in one group and Year in another: the right sections, but two dates.
+            f'<div role="group">{DATE_SECTION.format("Month")}</div>'
+            f'<div role="group">{DATE_SECTION.format("Year")}</div>',
+            "2 date group",
+        ),
+        (  # One group, sections in day-first order.
+            '<div role="group">'
+            + "".join(DATE_SECTION.format(k) for k in ("Day", "Month", "Year"))
+            + "</div>",
+            "sections Day, Month, Year",
+        ),
+    ],
+)
+def test_date_sections_needs_one_group_in_a_known_order(open_app, html, why):
+    page = open_app()
+    page.set_content(html)
+    with pytest.raises(ValueError, match=why):
+        workday.date_sections(page)
+
+
+def test_fill_date_takes_the_page_when_it_holds_one_date(open_app):
+    page = open_app("Self Identify")
+    workday.fill_date(page, "1/2/2027")
+    assert group(page, "Date").locator('[data-automation-id="dateSectionDay-display"]').inner_text() == "02"
+
+
 def test_select_one_is_a_button_and_a_listbox_not_a_select(open_app):
     page = open_app("My Information")
     button = page.get_by_role("button", name="Country Select One Required")
